@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Odin UI showcase</title>
+<style>
+html,body { margin:0; height:100%; overflow:hidden; background:#1a1d24; }
+canvas { display:block; width:100%; height:100%; outline:none; touch-action:none; }
+#status { position:absolute; inset:40% 0 auto; text-align:center; color:white; font:18px sans-serif; }
+</style>
+<canvas id="canvas" tabindex="0" aria-label="Odin UI control showcase"></canvas>
+<div id="status" role="status">Loading Odin UI…</div>
+<script src="odin.js"></script>
+<script>
+var Module = (() => {
+  const canvas = document.getElementById('canvas');
+  const status = document.getElementById('status');
+  const memory = new odin.WasmMemoryInterface();
+  memory.setIntSize(4);
+  const odinImports = odin.setupDefaultImports(memory);
+  const failed = error => { status.hidden = false; status.textContent = 'Unable to start Odin UI.'; console.error(error); };
+  canvas.addEventListener('pointerdown', () => canvas.focus());
+  canvas.addEventListener('keydown', event => { if (['Backspace','ArrowLeft','ArrowRight','Tab'].includes(event.key)) event.preventDefault(); });
+  return {
+    canvas, print: console.log, printErr: console.error, onAbort: failed,
+    instantiateWasm(imports, ready) {
+      fetch('showcase.wasm').then(response => {
+        if (!response.ok) throw new Error('Unable to load showcase.wasm');
+        return response.arrayBuffer();
+      }).then(bytes => WebAssembly.instantiate(bytes, {...odinImports, ...imports})).then(({instance}) => {
+        memory.setExports(instance.exports);
+        memory.setMemory(instance.exports.memory);
+        ready(instance);
+      }).catch(failed);
+      return {};
+    },
+    onRuntimeInitialized() {
+      try {
+        wasmExports._start();
+        wasmExports.ui_start();
+        status.hidden = true;
+        canvas.focus();
+        function frame() {
+          try {
+            wasmExports.ui_frame(Math.max(1,canvas.clientWidth), Math.max(1,canvas.clientHeight));
+            requestAnimationFrame(frame);
+          } catch(error) { failed(error); }
+        }
+        requestAnimationFrame(frame);
+      } catch(error) { failed(error); }
+    }
+  };
+})();
+</script>
+<script src="showcase.js"></script>
+</html>

@@ -1,0 +1,132 @@
+-- allium: 3
+-- Shared frame-local layout for Odin UI consumers.
+--
+-- Philosophy: keep Clay's small compositional core, not its complete feature set.
+-- A screen declares an ordered tree for each presented frame. The layout engine
+-- resolves that tree into geometry without owning application state or rendering.
+-- The layout, text and input packages are renderer- and platform-independent.
+-- The raylib adapter provides measurement and drawing. Applications own screen
+-- composition, styles, state transitions and platform lifecycle.
+
+------------------------------------------------------------
+-- Contracts
+------------------------------------------------------------
+
+contract LayoutDefinition {
+    begin: (viewport: LayoutSize, root: RootStyle) -> None
+    row: (style: ContainerStyle) -> LayoutIndex
+    column: (style: ContainerStyle) -> LayoutIndex
+    text: (content: String, style: TextStyle) -> LayoutIndex
+    field: (content: String, trigger: Trigger, style: FieldStyle) -> LayoutIndex
+    button: (content: String, trigger: Trigger, style: ButtonStyle) -> LayoutIndex
+    separator: (style: SeparatorStyle) -> LayoutIndex
+    space: () -> LayoutIndex
+    close: () -> None
+    finish: () -> LayoutFailure?
+
+    @invariant FrameLocalOrderedTree
+        -- Begin creates one ordered screen tree at the viewport. Calls until finish
+        -- declare only visible rows, columns, text, fields, buttons and separators,
+        -- plus grow space used to separate groups. Row and column make a container
+        -- current until its matching close. Ordinary Odin procedures compose these
+        -- few constructs into project-specific UI such as a top bar.
+
+    @invariant OnlyMeaningfulNodeData
+        -- Nodes carry layout, caller-selected drawing payload and optional trigger data
+        -- for the current frame. Text, fields and buttons contain text measured by
+        -- the builder. Buttons, fields and explicitly actionable containers carry
+        -- opaque triggers; ordinary containers and grow space carry no action. A separator infers its orientation from
+        -- its parent rather than carrying redundant horizontal or vertical input.
+
+    @invariant MeaningfulZeroValues
+        -- Every omitted or zero-initialized field selects its common valid meaning.
+        -- Nil sizing fits content, nil failure means success, zero padding and gap
+        -- add no space, and zero direction and alignment use their defaults.
+
+    @invariant OrdinaryOdinComposition
+        -- Reusable controls, loops and conditions are ordinary Odin. Layout adds
+        -- no markup, parser, stylesheet, retained widget hierarchy or component
+        -- model.
+
+    @invariant SelfContainedLibrary
+        -- Layout, text and input depend only on Odin core libraries. The raylib
+        -- adapter adds raylib. None imports consumer state, application, catalog,
+        -- screen, label or product types.
+        -- Application code supplies final visible values, styles and opaque triggers.
+
+    @invariant SingleScreenRepresentation
+        -- Resolution fills sizes and absolute positions into the declared screen
+        -- nodes. It produces no parallel screen-specific layout value, draw list,
+        -- hit-region list or action table. After success, the same immutable screen
+        -- is sufficient for general drawing and for evaluating the next input.
+
+    @invariant PresentedFrameSequence
+        -- Input is evaluated against the geometry and actions of the frame the user
+        -- can see. The resulting application state then produces and presents one
+        -- successor frame. Layout is not rebuilt before input. A viewport change
+        -- replaces the presentation without applying pointer input against geometry
+        -- from the previous viewport.
+
+    @invariant BalancedAndBoundedInput
+        -- A failure union distinguishes invalid dimensions, unbalanced calls and
+        -- exhaustion of node or depth capacity. Nil means success. Callers may read
+        -- finalized rectangles only after success, so failure exposes no partial
+        -- layout.
+}
+
+contract LayoutResolution {
+    resolve: (tree: LayoutTree, viewport: LayoutSize) -> LayoutOutput
+
+    @invariant AxisResolution
+        -- Fixed children keep their declared size. Fit children take their content
+        -- size. Grow children start at their content size and share positive free
+        -- space equally. Fit and grow may compress but do not become negative.
+
+    @invariant FinalPositionPass
+        -- The engine positions children in declaration order inside the parent's
+        -- padding. Independent horizontal and vertical alignment position children
+        -- on both physical axes. Centre is the default on each axis.
+
+    @invariant PureAndHostTestable
+        -- Equal trees and viewport sizes produce equal rectangles. Resolution reads
+        -- no application state, clock, input device, Android API or renderer state.
+
+    @invariant BuilderOwnsMeasurement
+        -- The screen builder measures visible text with the same font and spacing
+        -- used for drawing and supplies its intrinsic size. The general resolver
+        -- does not know fonts, renderer state or project-specific text semantics.
+        -- Multiline content fits every measured line, including ordinary padding
+        -- for controls, so scrolling can reach the full content.
+
+    @invariant GeneralDrawing
+        -- Drawing iterates resolved nodes in declaration order and reads only their
+        -- geometry and drawing data. It reads no MeaningfulState, LocalState or
+        -- project-specific meaning. Reverse declaration order determines the first
+        -- eligible button under a pointer when visible nodes overlap.
+
+    @invariant RoundedControlGeometry
+        -- Drawing and hit testing clamp a corner radius to half the smaller
+        -- resolved dimension. Zero-area controls neither draw nor receive hits;
+        -- borders never use negative dimensions.
+
+    @invariant TriggerMeaning
+        -- A visible button carries the smallest stable trigger value needed for the
+        -- application to identify its result. A trigger combines its stable semantic
+        -- path with an opaque payload for the typed application action. The payload
+        -- lives with the presented nodes until their input is consumed; actions are
+        -- carried by those nodes, without a separate lookup table or path decoder.
+        -- The general screen library neither interprets triggers nor applies
+        -- application state changes.
+
+    @invariant ResolutionFailure
+        -- A failed screen never becomes presented. Development fails immediately so
+        -- the declaration defect is visible. Production failure handling remains an
+        -- explicit policy decision rather than silently presenting geometry that no
+        -- longer agrees with application state.
+}
+
+------------------------------------------------------------
+-- Open Questions
+------------------------------------------------------------
+
+open question "What should production present when construction or resolution of a successor screen fails?"
