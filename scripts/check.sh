@@ -14,3 +14,4 @@ done
 for package in layout text input; do
     ./scripts/odin.sh check "src/$package" -target:js_wasm32 -no-entry-point -vet
 done
+./scripts/check-vendored.sh

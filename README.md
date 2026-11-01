@@ -1,7 +1,7 @@
 # Odin UI
 
-Shared, immediate UI extracted from Gond, Lantern House and Devil's Arena. Layout,
-text processing and interaction are independent of operating systems and renderers.
+Shared, immediate UI library. Layout, text processing and interaction are
+independent of operating systems and renderers.
 The raylib adapter adds drawing and optional input collection. Applications own
 their screens, commands, persistent state, native services and main loop.
 
@@ -19,16 +19,37 @@ can attach typed drawing data to the same nodes without giving the layout engine
 knowledge of fonts, textures or application actions. There is one geometry tree
 for layout, drawing, inspection and hit testing.
 
-## Import and ownership
+## Installation
 
-Use `scripts/odin.sh` in place of `odin` for builds/checks/tests, or supply
-`-collection:odin_ui=/absolute/path/to/odin-ui/src` to the compiler. Consumers may
-choose another checkout through their `ODIN_UI_ROOT` environment variable. Keep
-the library checkout alongside the game repositories; Gond's default is
-`../../Repositories/odin-ui` relative to its root.
+Download the source-copy archive from the
+[latest release](https://github.com/IgneousRed/odin-ui/releases/latest), extract
+`odin_ui/` into your project's `third_party/` folder, and commit that copy with
+your project. The archive contains the packages, MIT license, version and
+installation guide. It includes no compiler, raylib binaries or showcase assets.
+See [the copying and updating guide](VENDORING.md) for the complete directory
+layout, portable-only installation and upgrade procedure.
+
+From your project's `src/main.odin`:
 
 ```odin
-import ui "odin_ui:raylib"
+import ui "../third_party/odin_ui/raylib"
+```
+
+Build normally with `odin build src`. You can instead use
+`import ui "odin_ui:raylib"` with
+`odin build src -collection:odin_ui=third_party/odin_ui`. Both forms use the same
+copied sources. The package table above uses collection notation for brevity.
+
+Version `0.1.0` is an early release; the API may change before 1.0. Read the
+[changelog](CHANGELOG.md) before updating your copy.
+
+## Import and ownership
+
+Your host owns its window and frame loop. Inside that loop, using your chosen
+import path and a loaded font:
+
+```odin
+import ui "../third_party/odin_ui/raylib"
 import rl "vendor:raylib"
 
 screen: ui.UI
@@ -86,10 +107,6 @@ framebuffer scissor bounds match the logical geometry. Safe-area insets can be
 supplied as root padding. Native iOS integration is not provided or claimed by
 this extraction; it requires its own raylib host and target validation.
 
-Gond's CMake configuration tracks the shared sources as native build dependencies.
-Both games' development fingerprints include shared sources, so editing the library
-uses their existing rebuild/recovery mechanism without changing saved state.
-
 ## Checks and showcase
 
 The working toolchain for the first version is:
@@ -101,6 +118,11 @@ The working toolchain for the first version is:
 | Desktop raylib | `6.2` on macOS ARM64 | Linked through Odin's `vendor:raylib` collection; the tested Homebrew Odin package supplies bindings and links Homebrew raylib |
 | Emscripten (web builds) | `6.0.13` | [SDK installation guide](https://emscripten.org/docs/getting_started/downloads.html) |
 | Web raylib | `6.2`, static, OpenGL ES 2 | [Tagged source](https://github.com/raysan5/raylib/tree/6.2) |
+
+GitHub Actions runs the complete check suite on Ubuntu 24.04 using the official
+Odin `dev-2026-10` archive (including its bundled raylib) and Allium `3.6.1`.
+Downloaded tool archives are verified by SHA-256. The desktop and linked web
+showcase were also exercised with the macOS toolchain listed above.
 
 Install Odin and Allium using the linked upstream instructions, put their
 executables on `PATH`, and confirm `odin version` and `allium --version` before
@@ -122,6 +144,9 @@ installed dependencies and download no libraries.
 
 Checks run the shared Allium contract, portable tests and raylib geometry/text
 tests without opening a window, plus native and Wasm showcase type checks.
+They also package the actual release ZIP, extract it into a separate consumer
+project, run a headless native program and check the Wasm target using only the
+copied packages and ordinary Odin commands.
 Consumer projects validate their own code and application integration; they do
 not invoke this repository’s check suite.
 The showcase demonstrates resize, wrapping, buttons, fields, progress and shared
@@ -166,18 +191,35 @@ belong in `.work/`.
 
 ## Specification and provenance
 
-`spec/ui-layout.allium` owns the shared layout contract, extracted from Gond, and
-is checked in this repository. Consumer specs define and validate their own
-application behavior and ownership boundaries without importing the library's
-specification into their check sets.
+`spec/ui-layout.allium` owns the shared layout contract and is checked in this
+repository. Consumer specs define and validate their own application behavior
+and ownership boundaries without importing the library's specification into
+their check sets.
 
-The source combines the three existing UI implementations, including Gond's
-controls, selection painting and HSL helpers; the games' wrapping and scrollbars;
-and Devil's Arena's custom clipping support. Original project code credits
-IgneousRed and retains the included PolyForm Noncommercial license. Odin and
-raylib retain their own licenses and are not copied into this repository.
-The showcase reuses Atkinson Hyperlegible Next from Devil's Arena, unchanged,
-with its SIL Open Font License in `examples/showcase/assets/OFL.txt`. Library
-consumers continue to supply their own fonts.
+Original project code is copyright IgneousRed and is available under the
+[MIT license](LICENSE), including commercial use. Keep its copyright and license
+notice with copied library code. Odin and raylib retain their own licenses and
+are not copied into this repository.
+The showcase embeds Atkinson Hyperlegible Next with its SIL Open Font License
+in `examples/showcase/assets/OFL.txt`. Library consumers continue to supply their
+own fonts.
 
 External reviewer selection is recorded in `TODO.md`.
+
+## Maintaining releases
+
+Repository development builds use `scripts/odin.sh`, which registers this
+checkout's `src/` as the `odin_ui` collection. Consumers do not need this helper.
+
+Before a release, update `VERSION` (version, source and tagged release URL),
+`VENDORING.md` and `CHANGELOG.md`, then run:
+
+```sh
+./scripts/check.sh
+./scripts/package.sh
+```
+
+The ZIP in `binaries/` is the same artifact exercised by the consumer check. It
+contains one `odin_ui/` folder ready to copy. Tag the checked commit, push it and
+attach that ZIP to the corresponding GitHub release. GitHub also supplies full
+repository source archives; those include the tests and showcase as well.
