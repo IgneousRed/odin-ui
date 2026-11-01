@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1
+
+- Use `vendor/odin_ui/` consistently in installation examples and consumer checks.
+- Clarify fixed-version updates, checksum verification, build/watch integration,
+  and retaining the MIT license with redistributed builds.
+- No library API or behavior changes.
+
 ## 0.1.0
 
 First public release. The API is evolving; compatibility is not promised across

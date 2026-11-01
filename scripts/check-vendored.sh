@@ -5,8 +5,8 @@ root=$PWD
 archive=$(./scripts/package.sh)
 work=$(mktemp -d "$root/.work/consumer.XXXXXX")
 trap 'rm -rf "$work"' EXIT
-mkdir -p "$work/project/src" "$work/project/third_party"
-unzip -q "$archive" -d "$work/project/third_party"
+mkdir -p "$work/project/src" "$work/project/vendor"
+unzip -q "$archive" -d "$work/project/vendor"
 cp tests/consumer/main.odin "$work/project/src/"
 # Run from the consumer root with no library collection flag or repository helper.
 cd "$work/project"

@@ -1,10 +1,10 @@
 // Copied to a separate project's src/ by scripts/check-vendored.sh.
 package main
 
-import layout "../third_party/odin_ui/layout"
-import text "../third_party/odin_ui/text"
-import input "../third_party/odin_ui/input"
-import ui "../third_party/odin_ui/raylib"
+import layout "../vendor/odin_ui/layout"
+import text "../vendor/odin_ui/text"
+import input "../vendor/odin_ui/input"
+import ui "../vendor/odin_ui/raylib"
 import rl "vendor:raylib"
 
 main :: proc() {

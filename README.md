@@ -23,7 +23,7 @@ for layout, drawing, inspection and hit testing.
 
 Download the source-copy archive from the
 [latest release](https://github.com/IgneousRed/odin-ui/releases/latest), extract
-`odin_ui/` into your project's `third_party/` folder, and commit that copy with
+`odin_ui/` into your project's `vendor/` folder, and commit that copy with
 your project. The archive contains the packages, MIT license, version and
 installation guide. It includes no compiler, raylib binaries or showcase assets.
 See [the copying and updating guide](VENDORING.md) for the complete directory
@@ -32,15 +32,15 @@ layout, portable-only installation and upgrade procedure.
 From your project's `src/main.odin`:
 
 ```odin
-import ui "../third_party/odin_ui/raylib"
+import ui "../vendor/odin_ui/raylib"
 ```
 
 Build normally with `odin build src`. You can instead use
 `import ui "odin_ui:raylib"` with
-`odin build src -collection:odin_ui=third_party/odin_ui`. Both forms use the same
+`odin build src -collection:odin_ui=vendor/odin_ui`. Both forms use the same
 copied sources. The package table above uses collection notation for brevity.
 
-Version `0.1.0` is an early release; the API may change before 1.0. Read the
+Version `0.1.1` is an early release; the API may change before 1.0. Read the
 [changelog](CHANGELOG.md) before updating your copy.
 
 ## Import and ownership
@@ -49,7 +49,7 @@ Your host owns its window and frame loop. Inside that loop, using your chosen
 import path and a loaded font:
 
 ```odin
-import ui "../third_party/odin_ui/raylib"
+import ui "../vendor/odin_ui/raylib"
 import rl "vendor:raylib"
 
 screen: ui.UI
