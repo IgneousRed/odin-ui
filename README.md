@@ -81,6 +81,15 @@ for buttons, fields and custom actionable nodes; `node_trigger` reads it and `hi
 returns the topmost visible trigger. Trigger paths and payload pointers are borrowed
 and must remain valid until input has consumed the presented frame.
 
+Scroll helpers take `(ui, offset, style)`. Identify a scroll container through
+`action(&screen, index, trigger)`, using the same node trigger as other controls.
+
+Fields accept `selection: text.Selection`, the same `{anchor, cursor}` byte offsets
+used by `text.edit`. Pass the returned selection directly to the field options;
+`cursor` separately controls caret visibility. Select all with `{0, len(value)}`
+or the editing helper's `.select_all` operation. Drawing clamps offsets to UTF-8
+codepoint boundaries and places the caret at `selection.cursor`.
+
 Application state remains authoritative. UI actions carry opaque paths/pointers;
 applications translate those into their own commands and transactions. Persistent
 scroll, focus and text selections remain caller-owned. UTF-8 editing is by

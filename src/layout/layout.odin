@@ -31,7 +31,6 @@ Style :: struct($Color: typeid) {
     clip_content: bool,
     scroll: bool,
     scroll_offset: f32,
-    scroll_path: string,
     scroll_color: Color,
 }
 Unbalanced :: struct {}
@@ -112,7 +111,8 @@ number_valid :: proc(value: f32) -> bool {
 rect_valid :: proc(rect: Rect) -> bool {
     return !math.is_nan(rect.x) && !math.is_inf(rect.x) &&
         !math.is_nan(rect.y) && !math.is_inf(rect.y) &&
-        number_valid(rect.width) && number_valid(rect.height)
+        number_valid(rect.width) && number_valid(rect.height) &&
+        !math.is_inf(rect.x + rect.width) && !math.is_inf(rect.y + rect.height)
 }
 
 @(private)
@@ -278,6 +278,7 @@ position :: proc(frame: ^Frame($Content, $Color), index: int) {
     if main_alignment == .end do main_offset = remaining_main
     if style.scroll {main_offset = 0}
     cursor := (horizontal ? node.rect.x + padding.left : node.rect.y + padding.top) + main_offset - clamp(style.scroll_offset, 0, node.max_scroll)
+    child_clip := intersection(node.clip, node.rect) if style.scroll || style.clip_content else node.clip
     child = node.first_child
     for child >= 0 {
         item := &frame.nodes[child]
@@ -309,7 +310,7 @@ position :: proc(frame: ^Frame($Content, $Color), index: int) {
                 height = main,
             }
         }
-        item.clip = intersection(node.clip, node.rect) if style.scroll || style.clip_content else node.clip
+        item.clip = child_clip
         position(frame, child)
         cursor += main + style.gap
         child = item.next_sibling
@@ -326,7 +327,8 @@ pixel_bounds :: proc(rect: Rect, scale: f32 = 1) -> Rect {
     if !number_valid(scale) || scale == 0 || rect.width <= 0 || rect.height <= 0 {return {}}
     left, top := math.floor(rect.x * scale), math.floor(rect.y * scale)
     right, bottom := math.ceil((rect.x + rect.width) * scale), math.ceil((rect.y + rect.height) * scale)
-    return {left, top, right - left, bottom - top}
+    pixels := Rect{left, top, right - left, bottom - top}
+    return pixels if rect_valid(pixels) else Rect{}
 }
 
 rounded_contains :: proc(point: Vec2, rect: Rect, radius: f32) -> bool {

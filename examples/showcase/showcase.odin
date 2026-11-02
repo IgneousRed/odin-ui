@@ -62,8 +62,7 @@ frame :: proc(width, height: f32) {
     ui.paragraph(&app.frame, font, "Resize this window. Layout, wrapping, clipping, controls and input share the same geometry on every host.", FONT_SIZE, rl.LIGHTGRAY)
     ui.button(&app.frame, font, fmt.tprintf("Click count: %d", app.clicks), FONT_SIZE, ACCENT, PANEL, {path = "count"}, {pressed = app.press.active})
     ui.field(&app.frame, font, string(app.name[:app.name_length]), FONT_SIZE, PANEL, ACCENT, {path = "name"},
-             {width = ui.grow(), cursor = app.editing, cursor_position = app.selection.cursor,
-              selection_start = app.selection.anchor, selection_end = app.selection.cursor,
+             {width = ui.grow(), cursor = app.editing, selection = app.selection,
               selection_background = ACCENT})
     ui.bar(&app.frame, f32(app.clicks % 11) / 10, 14, ACCENT, PANEL)
     ui.paragraph(&app.frame, font, "Application commands, persistence and native keyboard/IME services remain with the host.", FONT_SIZE, rl.LIGHTGRAY)

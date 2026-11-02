@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- Fields and their drawing content use `text.Selection` for both the highlighted
+  range and caret position. Replace `selection_start`, `selection_end` and
+  `cursor_position` with `selection = {anchor, cursor}`; replace the field's
+  `select_all` flag with `{0, len(value)}`. The `cursor` visibility flag remains.
+- Remove the raylib adapter's `Layout_Frame` alias; use `UI`.
+- Remove `Style.scroll_path` and the path argument from `scroll_row` and
+  `scroll_column`. Use `action` to identify scroll containers through node triggers.
+- Remove the unused `has_hold` button option and drawing-content field.
+- Keep the caret visible in empty focused fields.
+- Reject overflowing resolved rectangle edges and unrepresentable scissor bounds.
+
 ## 0.1.1
 
 - Use `vendor/odin_ui/` consistently in installation examples and consumer checks.

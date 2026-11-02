@@ -53,6 +53,9 @@ fractional_dpi_clips_round_both_edges :: proc(t: ^testing.T) {
     testing.expect_value(t, ui.pixel_bounds({0.9, 0.9, 0.2, 0.2}), {0, 0, 2, 2})
     testing.expect_value(t, ui.pixel_bounds({1.25, 2.25, 3.5, 4.5}, 2), {2, 4, 8, 10})
     testing.expect_value(t, ui.pixel_bounds({0, 0, 0, 10}), {})
+    testing.expect_value(t, ui.pixel_bounds({0, 0, 2, 2}, 2e38), {})
+    testing.expect_value(t, ui.pixel_bounds({2e38, 0, 2e38, 1}), {})
+    testing.expect_value(t, ui.pixel_bounds({0, 2e38, 1, 2e38}), {})
 }
 
 @(test)
@@ -80,5 +83,20 @@ finite_input_overflow_fails_resolution :: proc(t: ^testing.T) {
         ui.leaf(&frame, {}, {3e38, 10})
         _, invalid := ui.finish(&frame).(ui.Invalid_Dimensions)
         testing.expect(t, invalid, "Finite inputs must not resolve successfully to infinite or NaN geometry")
+    }
+}
+
+@(test)
+resolved_edges_remain_finite :: proc(t: ^testing.T) {
+    for horizontal in ([2]bool{false, true}) {
+        frame: Frame
+        ui.begin(&frame, 3e38, 3e38, {
+            width = ui.fixed(3e38), height = ui.fixed(3e38),
+            padding = {left = 3e38} if horizontal else {top = 3e38},
+            alignment = {.start, .start},
+        })
+        ui.leaf(&frame, {width = ui.fixed(3e38), height = ui.fixed(3e38)})
+        _, invalid := ui.finish(&frame).(ui.Invalid_Dimensions)
+        testing.expect(t, invalid, "Finite rectangle components must not hide an infinite right or bottom edge")
     }
 }

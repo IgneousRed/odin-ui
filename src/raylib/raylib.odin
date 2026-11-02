@@ -5,6 +5,7 @@ import text_core "../text"
 import "core:c"
 import "core:math"
 import "core:strings"
+import "core:unicode/utf8"
 import rl "vendor:raylib"
 
 NODE_CAPACITY :: layout.NODE_CAPACITY
@@ -16,7 +17,6 @@ Style :: layout.Style(rl.Color)
 Size :: layout.Size
 Trigger :: layout.Trigger
 UI :: layout.Frame(Layout_Content, rl.Color)
-Layout_Frame :: UI
 Node :: layout.Node(Layout_Content, rl.Color)
 HSL :: struct {hue, saturation, lightness: f32}
 Layout_Text :: struct {
@@ -30,11 +30,11 @@ Layout_Rectangle :: struct {color: rl.Color}
 Layout_Bar :: struct {value: f32, color, background: rl.Color}
 Layout_Content :: union {Layout_Rectangle, Layout_Text, Layout_Button, Layout_Bar}
 Text_Options :: struct {width, height: Size}
-Button_Options :: struct {width, height: Size, has_hold, pressed: bool}
+Button_Options :: struct {width, height: Size, pressed: bool}
 Field_Options :: struct {
     width, height: Size,
-    pressed, select_all, cursor: bool,
-    selection_start, selection_end, cursor_position: int,
+    pressed, cursor: bool,
+    selection: text_core.Selection,
     selection_background: rl.Color,
 }
 fixed :: layout.fixed
@@ -68,13 +68,16 @@ begin :: proc(ui: ^UI, width, height: f32, style: Style = {}) {
 finish :: proc(ui: ^UI) -> Layout_Failure {
     failure := layout.finish(ui)
     if failure != nil {return failure}
+    wrapped := false
     for &node in ui.nodes[:ui.count] {
         if content, ok := node.content.(Layout_Text); ok && content.wrap {
+            wrapped = true
             height := f32(len(text_lines(content, node.rect.width))) * (content.pixel_size + TEXT_LINE_GAP) - TEXT_LINE_GAP
             node.style.height = fixed(height)
             node.intrinsic.y = height
         }
     }
+    if !wrapped {return nil}
     return layout.finish(ui)
 }
 contains :: proc(ui: ^UI, index: int, point: rl.Vector2) -> bool {
@@ -121,24 +124,24 @@ Layout_Button :: struct {
 	pixel_size: f32,
 	background, pressed_background: rl.Color,
 	selection_background: rl.Color,
-	has_hold, pressed: bool,
-	underline, select_all, cursor: bool,
-	selection_start, selection_end, cursor_position: int,
+	pressed: bool,
+	underline, cursor: bool,
+	selection: text_core.Selection,
 }
 
 action :: proc(ui: ^UI, index: int, trigger: Trigger) {
 	if index >= 0 && index < ui.count do ui.nodes[index].trigger = trigger
 }
 
-scroll_column :: proc(ui: ^UI, path: string, offset: f32, style: Style = {}) -> int {
+scroll_column :: proc(ui: ^UI, offset: f32, style: Style = {}) -> int {
 	value := style
-	value.scroll, value.scroll_path, value.scroll_offset = true, path, offset
+	value.scroll, value.scroll_offset = true, offset
 	return column(ui, value)
 }
 
-scroll_row :: proc(ui: ^UI, path: string, offset: f32, style: Style = {}) -> int {
+scroll_row :: proc(ui: ^UI, offset: f32, style: Style = {}) -> int {
 	value := style
-	value.scroll, value.scroll_path, value.scroll_offset = true, path, offset
+	value.scroll, value.scroll_offset = true, offset
 	return row(ui, value)
 }
 
@@ -203,7 +206,7 @@ button_radius :: proc(pixel_size: f32) -> f32 {
 }
 
 measure_text :: proc(font: rl.Font, text: string, pixel_size: f32) -> rl.Vector2 {
-	runes := text_runes(text)
+	runes := utf8.string_to_runes(text, context.temp_allocator)
 	return rl.MeasureTextCodepoints(
 		font,
 		(^c.int)(raw_data(runes)),
@@ -257,7 +260,6 @@ button :: proc(
 			pixel_size = pixel_size,
 			background = background,
 			pressed_background = pressed_background,
-			has_hold = options.has_hold,
 			pressed = options.pressed,
 		}
 	}
@@ -286,9 +288,8 @@ field :: proc(
 	if index >= 0 {
 		control := &ui.nodes[index].content.(Layout_Button)
 		control.underline = true
-		control.select_all = options.select_all
 		control.cursor = options.cursor
-		control.selection_start, control.selection_end, control.cursor_position = options.selection_start, options.selection_end, options.cursor_position
+		control.selection = options.selection
 		control.selection_background = options.selection_background
 	}
 	return index
@@ -326,15 +327,6 @@ raylib_rect :: proc(rect: Layout_Rect) -> rl.Rectangle {
 }
 
 @(private)
-text_runes :: proc(text: string) -> []rune {
-	runes := make([dynamic]rune, 0, len(text), context.temp_allocator)
-	for value in text {
-		append(&runes, value)
-	}
-	return runes[:]
-}
-
-@(private)
 draw_text :: proc(
 	font: rl.Font,
 	text: string,
@@ -342,7 +334,7 @@ draw_text :: proc(
 	pixel_size: f32,
 	color: rl.Color,
 ) {
-	runes := text_runes(text)
+	runes := utf8.string_to_runes(text, context.temp_allocator)
 	size := rl.MeasureTextCodepoints(
 		font,
 		(^c.int)(raw_data(runes)),
@@ -368,6 +360,12 @@ begin_clip :: proc(ui: ^UI, index: int, scale: f32 = 1) -> bool {
     if clip.width <= 0 || clip.height <= 0 {return false}
     pixels := layout.pixel_bounds(clip, scale)
     if pixels.width <= 0 || pixels.height <= 0 {return false}
+    scissor_min := f32(min(i32))
+    // The positive i32 limit is exclusive and exactly representable as f32.
+    scissor_limit := -scissor_min
+    for value in ([6]f32{pixels.x, pixels.y, pixels.width, pixels.height, pixels.x + pixels.width, pixels.y + pixels.height}) {
+        if value < scissor_min || value >= scissor_limit {return false}
+    }
     rl.BeginScissorMode(i32(pixels.x), i32(pixels.y), i32(pixels.width), i32(pixels.height))
     return true
 }
@@ -375,8 +373,7 @@ begin_clip :: proc(ui: ^UI, index: int, scale: f32 = 1) -> bool {
 draw :: proc(ui: ^UI, scale: f32 = 1) {
 	if ui.count == 0 && ui.failure == nil {return}
 	assert(ui.failure == nil && ui.depth == 1)
-	for index in 0 ..< ui.count {
-		node := &ui.nodes[index]
+	for &node, index in ui.nodes[:ui.count] {
 		if !begin_clip(ui, index, scale) {continue}
 		if style := node.style; style.has_background || style.background.a > 0 {
             if style.radius > 0 && node.rect.width > 0 && node.rect.height > 0 {
@@ -397,7 +394,7 @@ draw :: proc(ui: ^UI, scale: f32 = 1) {
                 for line in text_lines(content, node.rect.width) {
                     x := node.rect.x
                     if content.centered {x += (node.rect.width - measure_text(content.font, line, content.pixel_size).x) / 2}
-                    runes := text_runes(line)
+                    runes := utf8.string_to_runes(line, context.temp_allocator)
                     rl.DrawTextCodepoints(content.font, raw_data(runes), c.int(len(runes)), {x, y}, content.pixel_size, 0, content.color)
                     y += content.pixel_size + TEXT_LINE_GAP
                 }
@@ -424,16 +421,19 @@ draw :: proc(ui: ^UI, scale: f32 = 1) {
 					rl.DrawRectangleRoundedLinesEx(border_box, border_roundness, segments, BORDER_WIDTH, foreground)
 				}
 			}
-			selected := (content.select_all || content.selection_start != content.selection_end) && len(content.value) > 0
+			selection := text_core.Selection{
+				anchor = text_boundary(content.value, content.selection.anchor),
+				cursor = text_boundary(content.value, content.selection.cursor),
+			}
+			selected := selection.anchor != selection.cursor
 			size, origin: rl.Vector2
 			if selected || content.cursor {
 				size = measure_text(content.font, content.value, content.pixel_size)
+				size.y = max(content.pixel_size, size.y)
 				origin = {node.rect.x + (node.rect.width - size.x) / 2, node.rect.y + (node.rect.height - size.y) / 2}
 			}
 			if selected {
-				start := text_boundary(content.value, min(content.selection_start, content.selection_end))
-				end := text_boundary(content.value, max(content.selection_start, content.selection_end))
-				if content.select_all {start = 0; end = len(content.value)}
+				start, end := min(selection.anchor, selection.cursor), max(selection.anchor, selection.cursor)
 				before := measure_text(content.font, content.value[:start], content.pixel_size).x
 				width := measure_text(content.font, content.value[start:end], content.pixel_size).x
 				rl.DrawRectangleRec({origin.x + before, origin.y, width, size.y}, content.selection_background)
@@ -445,14 +445,13 @@ draw :: proc(ui: ^UI, scale: f32 = 1) {
 				rl.DrawRectangleRec({node.rect.x + padding, y, node.rect.width - padding * 2, BORDER_WIDTH}, foreground)
 			}
 			if content.cursor {
-				position := text_boundary(content.value, content.cursor_position)
-				before := measure_text(content.font, content.value[:position], content.pixel_size).x
+				before := measure_text(content.font, content.value[:selection.cursor], content.pixel_size).x
 				rl.DrawRectangleRec({origin.x + before, origin.y, BORDER_WIDTH, size.y}, foreground)
 			}
 		}
 		rl.EndScissorMode()
 	}
-    for node, index in ui.nodes[:ui.count] {
+    for &node, index in ui.nodes[:ui.count] {
         style := node.style
         if !style.scroll || node.max_scroll <= 0 || style.scroll_color.a == 0 || !begin_clip(ui, index, scale) {continue}
         horizontal := style.direction == .horizontal

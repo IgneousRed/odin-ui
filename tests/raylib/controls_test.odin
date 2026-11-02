@@ -1,6 +1,7 @@
 package tests
 
 import imui "../../src/raylib"
+import text "../../src/text"
 import "core:testing"
 import rl "vendor:raylib"
 
@@ -13,6 +14,17 @@ empty_optional_surface_needs_no_window :: proc(t: ^testing.T) {
 	frame: imui.UI
 	imui.draw(&frame)
 	testing.expect_value(t, frame.count, 0)
+}
+
+@(test)
+unrepresentable_clips_are_rejected_without_rendering :: proc(t: ^testing.T) {
+    for extent in ([3]f32{2, f32(1 << 31), 2e38}) {
+        frame: imui.UI
+        imui.begin(&frame, extent, extent)
+        testing.expect(t, imui.finish(&frame) == nil)
+        scale := f32(2e38) if extent == 2 else 1
+        testing.expect(t, !imui.begin_clip(&frame, 0, scale), "Reject overflow before converting scissor coordinates or calling raylib")
+    }
 }
 
 @(test)
@@ -38,7 +50,7 @@ text_point_and_rounded_hit_rules :: proc(t: ^testing.T) {
 
 @(test)
 layout_balances_only_explicitly_opened_containers :: proc(t: ^testing.T) {
-	frame: imui.Layout_Frame
+	frame: imui.UI
 	imui.begin(&frame, 100, 100)
 	imui.layout_open(&frame, {})
 	imui.close(&frame)
@@ -52,7 +64,7 @@ layout_balances_only_explicitly_opened_containers :: proc(t: ^testing.T) {
 
 @(test)
 fit_compresses_on_the_cross_axis :: proc(t: ^testing.T) {
-	frame: imui.Layout_Frame
+	frame: imui.UI
 	imui.begin(&frame, 40, 20)
 	container := imui.layout_open(&frame, {width = nil, height = imui.fixed(10)})
 	imui.layout_leaf(&frame, {width = imui.fixed(100), height = imui.fixed(10)})
@@ -90,7 +102,7 @@ controls_hit_only_their_visible_rounded_geometry :: proc(t: ^testing.T) {
 actions_use_the_same_trigger_for_controls_and_containers :: proc(t: ^testing.T) {
     font := monospace_font()
     payload := 42
-    paths := [3]string{"button", "field", "container"}
+    paths := [5]string{"button", "field", "container", "scroll column", "scroll row"}
     for replace in ([2]bool{false, true}) {
         frame: imui.UI
         imui.begin(&frame, 300, 50, {direction = .horizontal, alignment = {.start, .start}})
@@ -99,11 +111,18 @@ actions_use_the_same_trigger_for_controls_and_containers :: proc(t: ^testing.T) 
         container := imui.column(&frame, {width = imui.fixed(50), height = imui.fixed(20)})
         imui.close(&frame)
         imui.action(&frame, container, {path = "container"})
-        for index in ([3]int{button, field, container}) {
+        scroll_column := imui.scroll_column(&frame, 0, {width = imui.fixed(50), height = imui.fixed(20)})
+        imui.close(&frame)
+        imui.action(&frame, scroll_column, {path = "scroll column"})
+        scroll_row := imui.scroll_row(&frame, 0, {width = imui.fixed(50), height = imui.fixed(20)})
+        imui.close(&frame)
+        imui.action(&frame, scroll_row, {path = "scroll row"})
+        indexes := [5]int{button, field, container, scroll_column, scroll_row}
+        for index in indexes {
             if replace {imui.action(&frame, index, {path = "replacement", data = &payload})}
         }
         testing.expect(t, imui.finish(&frame) == nil)
-        for index, ordinal in ([3]int{button, field, container}) {
+        for index, ordinal in indexes {
             bounds := frame.nodes[index].rect
             expected := imui.Trigger{path = paths[ordinal]}
             if replace {expected = {path = "replacement", data = &payload}}
@@ -121,7 +140,11 @@ controls_keep_the_text_that_was_measured :: proc(t: ^testing.T) {
     font := monospace_font()
     imui.begin(&frame, 200, 100, {direction = .vertical})
     button := imui.button(&frame, font, string(source[:]), 10, rl.BLUE, rl.DARKBLUE, {})
-    field := imui.field(&frame, font, string(source[:]), 10, rl.BLUE, rl.DARKBLUE, {})
+    value, selection := text.edit(string(source[:]), {}, .select_all)
+    field := imui.field(&frame, font, value, 10, rl.BLUE, rl.DARKBLUE, {}, {selection = selection, cursor = true})
+    value, selection = text.edit(value, selection, .insert, "New")
+    testing.expect_value(t, value, "New")
+    testing.expect_value(t, selection, {3, 3})
     source[0] = 'X'
     testing.expect(t, imui.finish(&frame) == nil)
     for index in ([2]int{button, field}) {
@@ -129,6 +152,8 @@ controls_keep_the_text_that_was_measured :: proc(t: ^testing.T) {
         testing.expect_value(t, content.value, "A notice")
         testing.expect_value(t, frame.nodes[index].rect.width, f32(82.5))
     }
+    content := frame.nodes[field].content.(imui.Layout_Button)
+    testing.expect_value(t, content.selection, {0, 8})
 }
 
 @(test)
