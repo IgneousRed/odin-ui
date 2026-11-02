@@ -9,7 +9,7 @@ their screens, commands, persistent state, native services and main loop.
 
 | Import | Responsibility |
 | --- | --- |
-| `odin_ui:layout` | Frame-local layout, fit/fixed/grow sizing, alignment, clipping, hit geometry and horizontal/vertical scrolling. No raylib or OS imports. |
+| `odin_ui:layout` | Frame-local layout, fit/fixed/grow sizing, alignment, clipping, triggers, hit testing and horizontal/vertical scrolling. No raylib or OS imports. |
 | `odin_ui:text` | Measured wrapping, truncation and UTF-8 codepoint-safe cursor/selection editing. The host supplies text measurement. |
 | `odin_ui:input` | Pointer capture, click/drag cancellation, scrolling, focus traversal, DPI-coordinate conversion and safe-area bounds. Caller-owned state; no input polling. |
 | `odin_ui:raylib` | Text measurement/drawing, paragraphs, buttons, fields, progress bars, colors, clipping, scrollbars, trigger hit testing and optional mouse/touch polling. |
@@ -67,18 +67,46 @@ resolution. `row`, `column`, `scroll_row`, `scroll_column`, `separator`, `space`
 pair a successful call with raylib's `EndScissorMode`.
 
 The raylib text, paragraph, button and field builders copy displayed strings into
-the caller's temporary allocator. Frames use that allocator too. The pure
-`layout.begin` also accepts an explicit allocator. Keep its storage alive while
-the frame is displayed and while evaluating the next input against it; reclaim
-that storage only after input has consumed the old frame. Copy text returned by
-the editing helpers into application-owned storage if it must survive the frame.
-Node and depth limits are configurable through `UI_NODE_CAPACITY` (1024) and
-`UI_DEPTH_CAPACITY` (32), with explicit failures instead of partial successful
-layouts. No mutable singleton or relational engine is required by the library.
+the allocator supplied to `begin`, which defaults to the caller's temporary
+allocator. Prepared paragraph lines use that same allocator. Both `layout.begin`
+and raylib's `begin` accept an explicit `allocator` and optional `storage` slice
+of nodes. A nonempty slice supplies the frame's node capacity and is reused
+without allocating or clearing unused nodes; omitted storage uses
+`UI_NODE_CAPACITY`. For example, pass `storage = nodes[:]` for a caller-owned
+array of `ui.Node`. Reuse it only after input has consumed the old frame.
+Keep displayed strings and prepared lines alive through drawing and the next
+input as well; reclaim them only after input has consumed the old frame. Copy text
+returned by the editing helpers into application-owned storage if it must survive
+the frame.
+The default node limit and the depth limit are configurable through
+`UI_NODE_CAPACITY` (1024) and `UI_DEPTH_CAPACITY` (32), with explicit failures
+instead of partial successful layouts. `failure_node` identifies the node when
+resolution detects invalid geometry, or is `INVALID_INDEX` when no particular
+resolved node is responsible. This library owns no persistent application state;
+application-store, persistence, migration and recovery policies belong to hosts.
 
-Each node owns its trigger. `action(&screen, index, trigger)` sets or replaces it
-for buttons, fields and custom actionable nodes; `node_trigger` reads it and `hit`
-returns the topmost visible trigger. Trigger paths and payload pointers are borrowed
+`finish` must succeed before `contains`, `hit`, `begin_clip` or drawing can consume
+geometry. Successful finalization sets `resolved`; calling `finish` again reads
+the same result without redoing measurement. Builder calls and `action` after
+success fail with `Unbalanced` and invalidate the frame. Call `begin` to start
+another declaration. Do not directly change node data, geometry, viewport or
+validity fields after finalization. A failed frame supplies no hits and must not
+be presented. Construct a successor privately if a host needs to retain a prior
+presentation after failure; the showcase deliberately asserts on failure.
+Drawing a zero-initialized optional surface remains a no-op.
+
+Wrapping prepares lines once and derives intrinsic height without rewriting
+declared styles. Paragraph height fits by default and can compress in a constrained
+non-scrolling container, consistently with other fit content. Scroll containers
+retain the full measured content extent. Scratch decoding and drawing still use
+`context.temp_allocator`; this may be reset separately when presentation data has
+an explicit longer-lived allocator.
+
+Each node owns its trigger. The portable `layout` package supplies `action`,
+`node_trigger` and `hit`; the raylib package exposes the same operations with its
+coordinate types. During construction, `action(&screen, index, trigger)` sets or
+replaces it for buttons, fields and custom actionable nodes. `node_trigger` reads
+it and `hit` returns the topmost visible trigger. Trigger paths and payload pointers are borrowed
 and must remain valid until input has consumed the presented frame.
 
 Scroll helpers take `(ui, offset, style)`. Identify a scroll container through
@@ -97,6 +125,24 @@ codepoint, not grapheme cluster; text shaping, clipboard I/O and native IME
 composition/keyboard presentation are host services. A host can commit text and
 selection changes through the portable editing helpers without importing an
 application model into this library.
+
+Text inputs and insertions must be valid UTF-8; boundary helpers align offsets
+within valid input rather than validating malformed bytes. Paragraph wrapping
+normalizes whitespace within each explicit newline-delimited paragraph to single
+spaces and preserves empty paragraphs. Measurement callbacks must be deterministic
+for their supplied inputs, return finite nonnegative sizes, and not retain their
+transient candidate strings. Text helpers `lines`, `fit` and `edit` accept an
+optional output allocator. Results may borrow unchanged input (for example, a
+label that already fits); copy results when independent ownership is needed.
+Allocating helpers use a frame/arena lifetime. Wrapped line strings share a buffer;
+reclaim the allocator as a whole rather than freeing individual line substrings.
+
+Input helpers expect finite logical dimensions, nonnegative insets and drag
+thresholds, and finite offsets, wheel deltas and scroll limits. A nonpositive DPI
+scale means 1. `input.pointer` derives a logical pointer from a mouse sample and
+touch samples without polling devices; mouse ID is -1 and touch IDs are
+nonnegative. The raylib `pointer` helper only collects those samples and delegates
+capture continuity and coordinate conversion to that portable function.
 
 ## Platforms
 
@@ -151,11 +197,14 @@ installed dependencies and download no libraries.
 ./binaries/showcase
 ```
 
-Checks run the shared Allium contract, portable tests and raylib geometry/text
-tests without opening a window, plus native and Wasm showcase type checks.
-They also package the actual release ZIP, extract it into a separate consumer
-project, run a headless native program and check the Wasm target using only the
-copied packages and ordinary Odin commands.
+Checks validate the shared Allium specification and run portable tests and raylib
+geometry/text tests without opening a window, plus native and Wasm showcase type
+checks.
+Named regression cases reference the specification's lifecycle, ownership and
+measurement invariants; the specification check itself does not execute the Odin
+implementation. Checks also package the actual release ZIP, verify its checksum,
+extract it into a separate consumer project, run a headless native program and
+check the Wasm target using only the copied packages and ordinary Odin commands.
 Consumer projects validate their own code and application integration; they do
 not invoke this repository’s check suite.
 The showcase demonstrates resize, wrapping, buttons, fields, progress and shared
@@ -210,8 +259,9 @@ Original project code is copyright IgneousRed and is available under the
 notice with copied library code. Odin and raylib retain their own licenses and
 are not copied into this repository.
 The showcase embeds Atkinson Hyperlegible Next with its SIL Open Font License
-in `examples/showcase/assets/OFL.txt`. Library consumers continue to supply their
-own fonts.
+in `examples/showcase/assets/OFL.txt`. Its exact source revision and binary
+checksum are recorded in [the asset manifest](examples/showcase/assets/VENDORING.md).
+Library consumers continue to supply their own fonts.
 
 External reviewer selection is recorded in `TODO.md`.
 
@@ -229,6 +279,8 @@ Before a release, update `VERSION` (version, source and tagged release URL),
 ```
 
 The ZIP in `binaries/` is the same artifact exercised by the consumer check. It
-contains one `odin_ui/` folder ready to copy. Tag the checked commit, push it and
-attach that ZIP to the corresponding GitHub release. GitHub also supplies full
-repository source archives; those include the tests and showcase as well.
+contains one `odin_ui/` folder ready to copy. Packaging prepares and validates a
+new archive privately before replacing the previous ZIP, and produces
+`binaries/SHA256SUMS.txt`. Tag the checked commit, push it and attach both files
+to the corresponding GitHub release. GitHub also supplies full repository source
+archives; those include the tests and showcase as well.

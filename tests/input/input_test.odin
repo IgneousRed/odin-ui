@@ -4,6 +4,21 @@ import input "../../src/input"
 import "core:testing"
 
 @(test)
+drag_thresholds_preserve_clicks_at_extreme_finite_scales :: proc(t: ^testing.T) {
+    for threshold in ([2]f32{1e20, 1e-25}) {
+        capture: input.Press
+        pressed := input.button(&capture, {pressed = true, down = true}, true, threshold)
+        testing.expect(t, pressed.pressed && !pressed.dragging)
+        held := input.button(&capture, {position = {threshold / 2, 0}, down = true}, true, threshold)
+        testing.expect(t, held.held && !held.dragging)
+        released := input.button(&capture, {position = {threshold / 2, 0}, released = true}, true, threshold)
+        testing.expect(t, released.clicked && !released.dragging)
+        input.button(&capture, {pressed = true, down = true}, true, threshold)
+        testing.expect(t, input.button(&capture, {position = {threshold, 0}, down = true}, true, threshold).dragging)
+    }
+}
+
+@(test)
 capture_drag_and_cancellation :: proc(t: ^testing.T) {
     capture: input.Press
     testing.expect(t, input.button(&capture, {id = 3, position = {20, 20}, pressed = true, down = true}, true).pressed)
@@ -60,4 +75,44 @@ immediate_scroll_drag_starts_at_current_offset :: proc(t: ^testing.T) {
         testing.expect_value(t, offset, f32(150))
         testing.expect(t, !scroll.press.active)
     }
+}
+
+@(test)
+device_snapshots_keep_touch_identity_and_cancel_lost_capture :: proc(t: ^testing.T) {
+    touches := [2]input.Touch{{7, {40, 60}}, {3, {10, 20}}}
+    selected := input.pointer({}, {}, touches[:], scale = 2)
+    testing.expect(t, selected.pressed && selected.down)
+    testing.expect_value(t, selected.id, 7)
+    testing.expect_value(t, selected.position, {20, 30})
+    touches[0], touches[1] = touches[1], touches[0]
+    held := input.pointer(selected, {}, touches[:], scale = 2)
+    testing.expect(t, held.down && !held.pressed)
+    testing.expect_value(t, held.id, 7)
+    cancelled := input.pointer(held, {}, touches[:1])
+    testing.expect(t, cancelled.cancelled && !cancelled.released)
+    testing.expect_value(t, cancelled.id, 7)
+    released := input.pointer(held, {})
+    testing.expect(t, released.released && !released.down)
+    blurred := input.pointer(held, {}, focused = false)
+    testing.expect(t, blurred.cancelled && !blurred.down)
+    mouse := input.pointer(released, {position = {60, 80}, pressed = true, down = true}, scale = 2)
+    testing.expect_value(t, mouse.id, -1)
+    testing.expect_value(t, mouse.position, {30, 40})
+    testing.expect(t, mouse.pressed && mouse.down)
+}
+
+@(test)
+touch_selection_preserves_idle_identity_and_delays_replacement_capture :: proc(t: ^testing.T) {
+    touches := [2]input.Touch{{7, {40, 60}}, {3, {10, 20}}}
+    idle := input.Pointer{id = 3, position = {1, 2}}
+    selected := input.pointer(idle, {}, touches[:])
+    testing.expect_value(t, selected.id, 3)
+    testing.expect_value(t, selected.position, {10, 20})
+    testing.expect(t, selected.pressed && selected.down)
+    cancelled := input.pointer(selected, {}, touches[:1])
+    testing.expect_value(t, cancelled, {id = 3, position = {10, 20}, cancelled = true})
+    replacement := input.pointer(cancelled, {}, touches[:1])
+    testing.expect_value(t, replacement, {id = 7, position = {40, 60}, pressed = true, down = true})
+    mouse := input.Pointer{id = -1, position = {5, 6}, down = true}
+    testing.expect_value(t, input.pointer(mouse, {}, touches[:]), {id = -1, position = {5, 6}, cancelled = true})
 }

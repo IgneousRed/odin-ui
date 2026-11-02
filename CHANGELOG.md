@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- Preserve rounded hit regions and drag thresholds at extreme finite scales.
+- Place field selections and carets within their own lines for multiline values.
+- Finalized frames reject subsequent builder/action changes until `begin`;
+  failed or unfinished frames cannot supply hits. Repeated `finish` is read-only.
+- Make trigger assignment and hit testing available in the portable layout package.
+- Let both layout and raylib `begin` accept an allocator and reusable node storage;
+  add optional output allocators to the portable text helpers.
+- Prepare wrapped lines once without rewriting declared sizing. Fit paragraphs now
+  obey compression in constrained non-scrolling containers; scrolling retains their
+  full measured height. Normalize paragraph whitespace using one reusable buffer.
+- Remove `Node.parent`, `Node.last_child`, `Style.has_background` and
+  `Layout_Rectangle`. Use `Style.background` for ordinary rectangular fills;
+  `Layout_Bar.background` also moves to the node style. Builder stack entries now
+  contain `index` and construction-only `last_child`.
+- Separate device sampling from portable pointer transitions; make showcase state
+  caller-owned, reuse its node storage and collect queued text in one buffer.
+- Build both showcases with debug information, check web symbols strictly against
+  explicit Odin runtime imports, and generate verified release checksums.
 - Fields and their drawing content use `text.Selection` for both the highlighted
   range and caret position. Replace `selection_start`, `selection_end` and
   `cursor_position` with `selection = {anchor, cursor}`; replace the field's

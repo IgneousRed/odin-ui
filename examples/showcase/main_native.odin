@@ -3,12 +3,14 @@ package main
 
 import rl "vendor:raylib"
 
+TARGET_FPS :: 60
+
 main :: proc() {
-    initialize()
+    app := initialize()
     defer rl.CloseWindow()
-    defer rl.UnloadFont(app_font)
-    rl.SetTargetFPS(60)
+    defer rl.UnloadFont(app.font)
+    rl.SetTargetFPS(TARGET_FPS)
     for !rl.WindowShouldClose() {
-        frame(f32(rl.GetScreenWidth()), f32(rl.GetScreenHeight()))
+        frame(&app, f32(rl.GetScreenWidth()), f32(rl.GetScreenHeight()))
     }
 }

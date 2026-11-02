@@ -39,3 +39,46 @@ editing_uses_utf8_selection_boundaries :: proc(t: ^testing.T) {
     testing.expect_value(t, value, "")
     testing.expect_value(t, selection, {0, 0})
 }
+
+@(test)
+wrapping_normalizes_words_and_preserves_empty_paragraphs :: proc(t: ^testing.T) {
+    cases := []struct {value: string, width: f32, expected: []string}{
+        {"  a\t b \n\nø\u2003c\n", 100, {"a b", "", "ø c", ""}},
+        {" a\tbcdef  g\n h  ", 30, {"a", "bcd", "ef", "g", "h"}},
+        {"é🙂ø\u2003z", 20, {"é🙂", "ø", "z"}},
+        {" a  b ", 0, {"a", "b"}},
+        {" \n\t\n", 10, {"", "", ""}},
+        {"", 10, {""}},
+    }
+    for sample in cases {
+        lines := text.lines(sample.value, sample.width, 10, monospace)
+        if !testing.expect_value(t, len(lines), len(sample.expected)) {continue}
+        for expected, index in sample.expected {
+            testing.expect_value(t, lines[index], expected)
+        }
+    }
+}
+
+// A measurement callback may depend on whole runs (for example, kerning).
+kerning :: proc(value: string, size: f32, data: rawptr) -> layout.Vec2 {
+    width := monospace(value, size, data).x
+    for index in 1 ..< len(value) {
+        if value[index - 1] == 'A' && value[index] == 'V' {width -= size / 2}
+    }
+    return {width, size}
+}
+
+@(test)
+truncation_measures_the_actual_suffix_candidate :: proc(t: ^testing.T) {
+    testing.expect_value(t, text.fit("Axxxxx", 10, 15, "V", kerning), "AV")
+    testing.expect_value(t, text.fit("é🙂abc", 10, 35, "…", monospace), "é🙂…")
+}
+
+@(test)
+wrapping_measures_whole_runs_when_splitting_words :: proc(t: ^testing.T) {
+    lines := text.lines(" AV  AVAV\tX ", 25, 10, kerning)
+    testing.expect_value(t, len(lines), 4)
+    for expected, index in ([4]string{"AV", "AVA", "V", "X"}) {
+        testing.expect_value(t, lines[index], expected)
+    }
+}

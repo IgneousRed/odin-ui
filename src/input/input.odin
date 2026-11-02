@@ -2,10 +2,34 @@ package input
 
 import layout "../layout"
 
+DRAG_THRESHOLD :: f32(8)
+
 Pointer :: struct {
     position: layout.Vec2,
     pressed, down, released, cancelled: bool,
     id: int,
+}
+
+Touch :: struct {id: int, position: layout.Vec2}
+
+// Mouse ID is -1; touch IDs are nonnegative. Positions enter in device pixels.
+// Polling belongs to the adapter; capture continuity and coordinate conversion are pure.
+pointer :: proc(previous, mouse: Pointer, touches: []Touch = nil, focused: bool = true, scale: f32 = 1) -> Pointer {
+    if !focused {return {id = previous.id, position = previous.position, cancelled = previous.down}}
+    if len(touches) > 0 {
+        selected := touches[0]
+        for touch in touches {
+            if touch.id == previous.id {selected = touch; break}
+        }
+        if previous.down && selected.id != previous.id {return {id = previous.id, position = previous.position, cancelled = true}}
+        return {position = logical_position({scale = scale}, selected.position), id = selected.id,
+                pressed = !previous.down || previous.id != selected.id, down = true}
+    }
+    if previous.down && previous.id >= 0 {return {id = previous.id, position = previous.position, released = true}}
+    result := mouse
+    result.id = -1
+    result.position = logical_position({scale = scale}, mouse.position)
+    return result
 }
 
 Viewport :: struct {
@@ -30,7 +54,7 @@ Press :: struct {active, dragging: bool, pointer_id: int, origin: layout.Vec2}
 Result :: struct {pressed, held, released, clicked, dragging: bool}
 
 // Capture belongs to the caller, so multiple windows and simultaneous pointers are independent.
-button :: proc(state: ^Press, pointer: Pointer, inside: bool, drag_threshold: f32 = 8) -> Result {
+button :: proc(state: ^Press, pointer: Pointer, inside: bool, drag_threshold: f32 = DRAG_THRESHOLD) -> Result {
     result: Result
     if pointer.cancelled && state.active && state.pointer_id == pointer.id {state^ = {}; return result}
     if pointer.pressed && inside && !state.active {
@@ -38,8 +62,10 @@ button :: proc(state: ^Press, pointer: Pointer, inside: bool, drag_threshold: f3
         result.pressed = true
     }
     if !state.active || state.pointer_id != pointer.id {return result}
-    delta := layout.Vec2{pointer.position.x - state.origin.x, pointer.position.y - state.origin.y}
-    if delta.x * delta.x + delta.y * delta.y >= drag_threshold * drag_threshold {state.dragging = true}
+    // Widen before subtraction and squaring to preserve finite f32 thresholds.
+    dx := f64(pointer.position.x) - f64(state.origin.x)
+    dy := f64(pointer.position.y) - f64(state.origin.y)
+    if dx * dx + dy * dy >= f64(drag_threshold) * f64(drag_threshold) {state.dragging = true}
     result.held, result.dragging = pointer.down, state.dragging
     if pointer.released {
         result.released = true
@@ -51,7 +77,7 @@ button :: proc(state: ^Press, pointer: Pointer, inside: bool, drag_threshold: f3
 
 Scroll :: struct {press: Press, origin_offset: f32}
 
-scroll :: proc(state: ^Scroll, pointer: Pointer, inside: bool, current, maximum, wheel: f32, horizontal: bool = false, drag_threshold: f32 = 8) -> (offset: f32, dragging: bool) {
+scroll :: proc(state: ^Scroll, pointer: Pointer, inside: bool, current, maximum, wheel: f32, horizontal: bool = false, drag_threshold: f32 = DRAG_THRESHOLD) -> (offset: f32, dragging: bool) {
     // Keep the old origin through release; button clears its capture on release.
     origin := state.press.origin
     event := button(&state.press, pointer, inside, drag_threshold)

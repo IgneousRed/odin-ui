@@ -4,6 +4,7 @@ import layout "../layout"
 import text_core "../text"
 import "core:c"
 import "core:math"
+import "core:mem"
 import "core:strings"
 import "core:unicode/utf8"
 import rl "vendor:raylib"
@@ -25,10 +26,10 @@ Layout_Text :: struct {
     pixel_size: f32,
     color: rl.Color,
     centered, wrap: bool,
+    wrapped_lines: []string,
 }
-Layout_Rectangle :: struct {color: rl.Color}
-Layout_Bar :: struct {value: f32, color, background: rl.Color}
-Layout_Content :: union {Layout_Rectangle, Layout_Text, Layout_Button, Layout_Bar}
+Layout_Bar :: struct {value: f32, color: rl.Color}
+Layout_Content :: union {Layout_Text, Layout_Button, Layout_Bar}
 Text_Options :: struct {width, height: Size}
 Button_Options :: struct {width, height: Size, pressed: bool}
 Field_Options :: struct {
@@ -45,7 +46,10 @@ layout_leaf :: layout.leaf
 intersection :: layout.intersection
 measure_width :: layout.measure_width
 text_boundary :: text_core.boundary
+action :: layout.action
+node_trigger :: layout.node_trigger
 
+BACKGROUND_CORNER_SEGMENTS :: 8
 TEXT_LINE_GAP :: f32(6)
 SCROLLBAR_INSET :: f32(4)
 SCROLLBAR_WIDTH :: f32(3)
@@ -62,22 +66,25 @@ LUMINANCE_THRESHOLD :: f32(0.5)
 COLOR_CHANNEL_MAX :: f32(255)
 HSL_SECTOR_DEGREES :: f32(60)
 
-begin :: proc(ui: ^UI, width, height: f32, style: Style = {}) {
-    layout.begin(ui, width, height, style)
+begin :: proc(ui: ^UI, width, height: f32, style: Style = {}, allocator: mem.Allocator = context.temp_allocator, storage: []Node = nil) {
+    layout.begin(ui, width, height, style, allocator, storage)
 }
 finish :: proc(ui: ^UI) -> Layout_Failure {
+    if ui.resolved {return ui.failure}
     failure := layout.finish(ui)
     if failure != nil {return failure}
     wrapped := false
     for &node in ui.nodes[:ui.count] {
         if content, ok := node.content.(Layout_Text); ok && content.wrap {
             wrapped = true
-            height := f32(len(text_lines(content, node.rect.width))) * (content.pixel_size + TEXT_LINE_GAP) - TEXT_LINE_GAP
-            node.style.height = fixed(height)
-            node.intrinsic.y = height
+            // Retain the derived lines for drawing; declared fit/fixed sizing stays intact.
+            content.wrapped_lines = text_lines(content, node.rect.width, ui.allocator)
+            node.content = content
+            node.intrinsic.y = f32(len(content.wrapped_lines)) * (content.pixel_size + TEXT_LINE_GAP) - TEXT_LINE_GAP
         }
     }
     if !wrapped {return nil}
+    ui.resolved = false
     return layout.finish(ui)
 }
 contains :: proc(ui: ^UI, index: int, point: rl.Vector2) -> bool {
@@ -92,7 +99,7 @@ text :: proc(ui: ^UI, font: rl.Font, value: string, pixel_size: f32, color: rl.C
     if width == nil {width = fixed(size.x)}
     if height == nil {height = fixed(max(pixel_size, size.y))}
     index := layout_leaf(ui, {width = width, height = height})
-    if index >= 0 {ui.nodes[index].content = Layout_Text{value = strings.clone(value, context.temp_allocator), font = font, pixel_size = pixel_size, color = color, centered = true}}
+    if index >= 0 {ui.nodes[index].content = Layout_Text{value = strings.clone(value, ui.allocator), font = font, pixel_size = pixel_size, color = color, centered = true}}
     return index
 }
 // Paragraphs wrap after horizontal layout has established the available width.
@@ -100,12 +107,12 @@ paragraph :: proc(ui: ^UI, font: rl.Font, value: string, pixel_size: f32, color:
     intrinsic := layout.Vec2{y = pixel_size}
     if width == nil {intrinsic.x = measure_text(font, value, pixel_size).x}
     index := layout_leaf(ui, {width = width}, intrinsic)
-    if index >= 0 {ui.nodes[index].content = Layout_Text{value = strings.clone(value, context.temp_allocator), font = font, pixel_size = pixel_size, color = color, centered = centered, wrap = true}}
+    if index >= 0 {ui.nodes[index].content = Layout_Text{value = strings.clone(value, ui.allocator), font = font, pixel_size = pixel_size, color = color, centered = centered, wrap = true}}
     return index
 }
-text_lines :: proc(content: Layout_Text, width: f32) -> []string {
+text_lines :: proc(content: Layout_Text, width: f32, allocator: mem.Allocator = context.temp_allocator) -> []string {
     font := content.font
-    return text_core.lines(content.value, width, content.pixel_size, measure_for_wrap, &font)
+    return text_core.lines(content.value, width, content.pixel_size, measure_for_wrap, &font, allocator)
 }
 @(private)
 measure_for_wrap :: proc(value: string, pixel_size: f32, data: rawptr) -> layout.Vec2 {
@@ -127,10 +134,6 @@ Layout_Button :: struct {
 	pressed: bool,
 	underline, cursor: bool,
 	selection: text_core.Selection,
-}
-
-action :: proc(ui: ^UI, index: int, trigger: Trigger) {
-	if index >= 0 && index < ui.count do ui.nodes[index].trigger = trigger
 }
 
 scroll_column :: proc(ui: ^UI, offset: f32, style: Style = {}) -> int {
@@ -255,7 +258,7 @@ button :: proc(
 	if index >= 0 {
 		ui.nodes[index].trigger = trigger
 		ui.nodes[index].content = Layout_Button {
-			value = strings.clone(value, context.temp_allocator),
+			value = strings.clone(value, ui.allocator),
 			font = font,
 			pixel_size = pixel_size,
 			background = background,
@@ -296,16 +299,14 @@ field :: proc(
 }
 
 separator :: proc(ui: ^UI, color: rl.Color, width := f32(1)) -> int {
-	if ui.failure != nil {return INVALID_LAYOUT_INDEX}
-	if ui.depth == 0 {ui.failure = Layout_Unbalanced{}; return INVALID_LAYOUT_INDEX}
-	parent := &ui.nodes[ui.stack[ui.depth - 1]]
+	if ui.failure != nil || ui.depth == 0 {return layout_leaf(ui, {})}
+	parent := &ui.nodes[ui.stack[ui.depth - 1].index]
 	direction := parent.style.direction
-	index := layout_leaf(ui, Style{
+	return layout_leaf(ui, Style{
 		width = grow() if direction == .vertical else fixed(width),
 		height = fixed(width) if direction == .vertical else grow(),
+        background = color,
 	})
-	if index >= 0 do ui.nodes[index].content = Layout_Rectangle{color}
-	return index
 }
 
 color_hsl :: proc(color: rl.Color) -> HSL {
@@ -326,35 +327,8 @@ raylib_rect :: proc(rect: Layout_Rect) -> rl.Rectangle {
 	return {rect.x, rect.y, rect.width, rect.height}
 }
 
-@(private)
-draw_text :: proc(
-	font: rl.Font,
-	text: string,
-	rect: Layout_Rect,
-	pixel_size: f32,
-	color: rl.Color,
-) {
-	runes := utf8.string_to_runes(text, context.temp_allocator)
-	size := rl.MeasureTextCodepoints(
-		font,
-		(^c.int)(raw_data(runes)),
-		c.int(len(runes)),
-		pixel_size,
-		0,
-	)
-	rl.DrawTextCodepoints(
-		font,
-		raw_data(runes),
-		c.int(len(runes)),
-		{rect.x + (rect.width - size.x) / 2, rect.y + (rect.height - size.y) / 2},
-		pixel_size,
-		0,
-		color,
-	)
-}
-
 begin_clip :: proc(ui: ^UI, index: int, scale: f32 = 1) -> bool {
-    if index < 0 || index >= ui.count {return false}
+    if !ui.resolved || index < 0 || index >= ui.count {return false}
     node := &ui.nodes[index]
     clip := intersection(node.clip, node.rect)
     if clip.width <= 0 || clip.height <= 0 {return false}
@@ -372,32 +346,33 @@ begin_clip :: proc(ui: ^UI, index: int, scale: f32 = 1) -> bool {
 
 draw :: proc(ui: ^UI, scale: f32 = 1) {
 	if ui.count == 0 && ui.failure == nil {return}
-	assert(ui.failure == nil && ui.depth == 1)
+	assert(ui.failure == nil && ui.resolved)
 	for &node, index in ui.nodes[:ui.count] {
 		if !begin_clip(ui, index, scale) {continue}
-		if style := node.style; style.has_background || style.background.a > 0 {
+		if style := node.style; style.background.a > 0 {
             if style.radius > 0 && node.rect.width > 0 && node.rect.height > 0 {
-                rl.DrawRectangleRounded(raylib_rect(node.rect), min(1, 2 * style.radius / min(node.rect.width, node.rect.height)), 8, style.background)
+                rl.DrawRectangleRounded(raylib_rect(node.rect), min(1, 2 * style.radius / min(node.rect.width, node.rect.height)), BACKGROUND_CORNER_SEGMENTS, style.background)
             } else {rl.DrawRectangleRec(raylib_rect(node.rect), style.background)}
         }
 		switch content in node.content {
 		case nil:
-		case Layout_Rectangle:
-			rl.DrawRectangleRec(raylib_rect(node.rect), content.color)
 		case Layout_Bar:
-            rl.DrawRectangleRec(raylib_rect(node.rect), content.background)
             rl.DrawRectangleRec({node.rect.x, node.rect.y, node.rect.width * content.value, node.rect.height}, content.color)
         case Layout_Text:
-            if !content.wrap {draw_text(content.font, content.value, node.rect, content.pixel_size, content.color)}
-            else {
-                y := node.rect.y
-                for line in text_lines(content, node.rect.width) {
-                    x := node.rect.x
-                    if content.centered {x += (node.rect.width - measure_text(content.font, line, content.pixel_size).x) / 2}
-                    runes := utf8.string_to_runes(line, context.temp_allocator)
-                    rl.DrawTextCodepoints(content.font, raw_data(runes), c.int(len(runes)), {x, y}, content.pixel_size, 0, content.color)
-                    y += content.pixel_size + TEXT_LINE_GAP
+            single_line := [1]string{content.value}
+            lines := content.wrapped_lines
+            if !content.wrap {lines = single_line[:]}
+            y := node.rect.y
+            for line in lines {
+                origin := rl.Vector2{node.rect.x, y}
+                runes := utf8.string_to_runes(line, context.temp_allocator)
+                if content.centered || !content.wrap {
+                    size := rl.MeasureTextCodepoints(content.font, (^c.int)(raw_data(runes)), c.int(len(runes)), content.pixel_size, 0)
+                    origin.x += (node.rect.width - size.x) / 2
+                    if !content.wrap {origin.y += (node.rect.height - size.y) / 2}
                 }
+                rl.DrawTextCodepoints(content.font, raw_data(runes), c.int(len(runes)), origin, content.pixel_size, 0, content.color)
+                y += content.pixel_size + TEXT_LINE_GAP
             }
 		case Layout_Button:
 			background := content.pressed_background if content.pressed else content.background
@@ -425,28 +400,41 @@ draw :: proc(ui: ^UI, scale: f32 = 1) {
 				anchor = text_boundary(content.value, content.selection.anchor),
 				cursor = text_boundary(content.value, content.selection.cursor),
 			}
-			selected := selection.anchor != selection.cursor
-			size, origin: rl.Vector2
-			if selected || content.cursor {
-				size = measure_text(content.font, content.value, content.pixel_size)
-				size.y = max(content.pixel_size, size.y)
-				origin = {node.rect.x + (node.rect.width - size.x) / 2, node.rect.y + (node.rect.height - size.y) / 2}
-			}
-			if selected {
+			runes := utf8.string_to_runes(content.value, context.temp_allocator)
+			size := rl.MeasureTextCodepoints(content.font, (^c.int)(raw_data(runes)), c.int(len(runes)), content.pixel_size, 0)
+			origin := rl.Vector2{node.rect.x + (node.rect.width - size.x) / 2, node.rect.y + (node.rect.height - size.y) / 2}
+			caret := rl.Rectangle{origin.x, node.rect.y + (node.rect.height - max(content.pixel_size, size.y)) / 2, BORDER_WIDTH, content.pixel_size}
+			if selection.anchor != selection.cursor || content.cursor {
+				// Measuring a newline follows raylib's current global line spacing.
+				line_step := measure_text(content.font, "\n", content.pixel_size).y - content.pixel_size
 				start, end := min(selection.anchor, selection.cursor), max(selection.anchor, selection.cursor)
-				before := measure_text(content.font, content.value[:start], content.pixel_size).x
-				width := measure_text(content.font, content.value[start:end], content.pixel_size).x
-				rl.DrawRectangleRec({origin.x + before, origin.y, width, size.y}, content.selection_background)
+				line_start := 0
+				y := caret.y
+				for line_end in 0 ..= len(content.value) {
+					if line_end < len(content.value) && content.value[line_end] != '\n' {continue}
+					line := content.value[line_start:line_end]
+					if selection.cursor >= line_start && selection.cursor <= line_end {
+						caret.x = origin.x + measure_text(content.font, line[:selection.cursor - line_start], content.pixel_size).x
+						caret.y = y
+					}
+					first, last := max(start, line_start), min(end, line_end)
+					if first < last {
+						before := measure_text(content.font, line[:first - line_start], content.pixel_size).x
+						width := measure_text(content.font, line[first - line_start:last - line_start], content.pixel_size).x
+						rl.DrawRectangleRec({origin.x + before, y, width, content.pixel_size}, content.selection_background)
+					}
+					line_start = line_end + 1
+					y += line_step
+				}
 			}
-			draw_text(content.font, content.value, node.rect, content.pixel_size, foreground)
+			rl.DrawTextCodepoints(content.font, raw_data(runes), c.int(len(runes)), origin, content.pixel_size, 0, foreground)
 			padding := control_padding(content.pixel_size)
 			if content.underline {
 				y := node.rect.y + node.rect.height - BORDER_WIDTH - padding
 				rl.DrawRectangleRec({node.rect.x + padding, y, node.rect.width - padding * 2, BORDER_WIDTH}, foreground)
 			}
 			if content.cursor {
-				before := measure_text(content.font, content.value[:selection.cursor], content.pixel_size).x
-				rl.DrawRectangleRec({origin.x + before, origin.y, BORDER_WIDTH, size.y}, foreground)
+				rl.DrawRectangleRec(caret, foreground)
 			}
 		}
 		rl.EndScissorMode()
@@ -467,6 +455,6 @@ draw :: proc(ui: ^UI, scale: f32 = 1) {
 }
 
 bar :: proc(ui: ^UI, value, height: f32, color, background: rl.Color) {
-    index := layout_leaf(ui, {width = grow(), height = fixed(height)})
-    if index >= 0 {ui.nodes[index].content = Layout_Bar{clamp(value, 0, 1), color, background}}
+    index := layout_leaf(ui, {width = grow(), height = fixed(height), background = background})
+    if index >= 0 {ui.nodes[index].content = Layout_Bar{clamp(value, 0, 1), color}}
 }

@@ -3,6 +3,7 @@ package tests
 import imui "../../src/raylib"
 
 import "core:testing"
+import "core:mem"
 import rl "vendor:raylib"
 
 @(test)
@@ -160,4 +161,63 @@ paragraphs_reject_invalid_sizes_and_wrap_at_fractional_width :: proc(t: ^testing
     testing.expect(t, imui.finish(&frame) == nil)
     testing.expect_value(t, len(imui.text_lines(frame.nodes[paragraph].content.(imui.Layout_Text), 0.5)), 4)
     testing.expect_value(t, frame.nodes[paragraph].rect.height, f32(19.6))
+}
+
+// LayoutResolution.BuilderOwnsMeasurement: wrapping is derived, styles remain declarations.
+@(test)
+wrapping_preserves_declared_sizing_and_prepares_lines_once :: proc(t: ^testing.T) {
+    frame: imui.UI
+    font := monospace_font()
+    imui.begin(&frame, 60, 200, {direction = .vertical, alignment = {.start, .start}})
+    paragraph := imui.paragraph(&frame, font, "one two three", 10, rl.WHITE)
+    style := frame.nodes[paragraph].style
+    testing.expect(t, imui.finish(&frame) == nil)
+    testing.expect_value(t, frame.nodes[paragraph].style, style)
+    content := frame.nodes[paragraph].content.(imui.Layout_Text)
+    testing.expect_value(t, len(content.wrapped_lines), 3)
+    lines := raw_data(content.wrapped_lines)
+    rect := frame.nodes[paragraph].rect
+    testing.expect(t, imui.finish(&frame) == nil)
+    testing.expect(t, raw_data(frame.nodes[paragraph].content.(imui.Layout_Text).wrapped_lines) == lines)
+    testing.expect_value(t, frame.nodes[paragraph].rect, rect)
+}
+
+@(test)
+presentation_text_survives_a_scratch_reset :: proc(t: ^testing.T) {
+    font := monospace_font()
+    presentation_buffer, scratch_buffer: [16384]u8
+    presentation, scratch: mem.Arena
+    mem.arena_init(&presentation, presentation_buffer[:])
+    mem.arena_init(&scratch, scratch_buffer[:])
+    context.temp_allocator = mem.arena_allocator(&scratch)
+    storage: [3]imui.Node
+    frame: imui.UI
+    source := [7]u8{'o', 'n', 'e', ' ', 't', 'w', 'o'}
+    imui.begin(&frame, 60, 100, {}, allocator = mem.arena_allocator(&presentation), storage = storage[:])
+    paragraph := imui.paragraph(&frame, font, string(source[:]), 10, rl.WHITE)
+    testing.expect(t, imui.finish(&frame) == nil)
+    free_all(context.temp_allocator)
+    source[0] = 'X'
+    content := frame.nodes[paragraph].content.(imui.Layout_Text)
+    testing.expect_value(t, content.value, "one two")
+    testing.expect_value(t, content.wrapped_lines[0], "one")
+    testing.expect_value(t, content.wrapped_lines[1], "two")
+}
+
+@(test)
+wrapped_content_obeys_fixed_sizing_and_remains_scrollable :: proc(t: ^testing.T) {
+    font := monospace_font()
+    frame: imui.UI
+    imui.begin(&frame, 60, 20, {direction = .vertical})
+    paragraph := imui.paragraph(&frame, font, "one two three", 10, rl.WHITE)
+    frame.nodes[paragraph].style.height = imui.fixed(12)
+    testing.expect(t, imui.finish(&frame) == nil)
+    testing.expect_value(t, frame.nodes[paragraph].rect.height, f32(12))
+    imui.begin(&frame, 60, 20, {direction = .vertical})
+    scroll := imui.scroll_column(&frame, 0, {width = imui.grow(), height = imui.grow()})
+    paragraph = imui.paragraph(&frame, font, "one two three", 10, rl.WHITE)
+    imui.close(&frame)
+    testing.expect(t, imui.finish(&frame) == nil)
+    testing.expect_value(t, frame.nodes[paragraph].rect.height, f32(42))
+    testing.expect_value(t, frame.nodes[scroll].max_scroll, f32(22))
 }

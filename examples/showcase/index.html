@@ -22,7 +22,7 @@ var Module = (() => {
   canvas.addEventListener('pointerdown', () => canvas.focus());
   canvas.addEventListener('keydown', event => { if (['Backspace','ArrowLeft','ArrowRight','Tab'].includes(event.key)) event.preventDefault(); });
   return {
-    canvas, print: console.log, printErr: console.error, onAbort: failed,
+    canvas, odinImports, print: console.log, printErr: console.error, onAbort: failed,
     instantiateWasm(imports, ready) {
       fetch('showcase.wasm').then(response => {
         if (!response.ok) throw new Error('Unable to load showcase.wasm');

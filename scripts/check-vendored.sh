@@ -3,6 +3,14 @@ set -eu
 cd "$(dirname "$0")/.."
 root=$PWD
 archive=$(./scripts/package.sh)
+(
+    cd "$root/binaries"
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum -c SHA256SUMS.txt
+    else
+        shasum -a 256 -c SHA256SUMS.txt
+    fi
+)
 work=$(mktemp -d "$root/.work/consumer.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 mkdir -p "$work/project/src" "$work/project/vendor"

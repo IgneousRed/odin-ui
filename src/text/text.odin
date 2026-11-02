@@ -2,10 +2,11 @@ package text
 
 import layout "../layout"
 import "core:strings"
+import "core:mem"
 
 Measure :: #type proc(value: string, pixel_size: f32, data: rawptr) -> layout.Vec2
 
-// Byte offsets are always brought back to a complete UTF-8 codepoint.
+// Inputs are valid UTF-8; byte offsets are brought back to a complete codepoint.
 boundary :: proc(value: string, desired: int) -> int {
     position := clamp(desired, 0, len(value))
     for position > 0 && position < len(value) && value[position] & 0xc0 == 0x80 {
@@ -25,56 +26,65 @@ next :: proc(value: string, position: int) -> int {
     return offset
 }
 
-// Uses the same lines for measurement and drawing. An over-wide glyph stays whole.
-lines :: proc(value: string, width, pixel_size: f32, measure: Measure, data: rawptr = nil) -> []string {
-    result := make([dynamic]string, context.temp_allocator)
-    for &paragraph in strings.split(value, "\n", context.temp_allocator) {
-        line := ""
+// Inputs are valid UTF-8. Paragraph whitespace is normalized to single spaces;
+// explicit newlines and empty paragraphs survive. An over-wide codepoint stays whole.
+// Result lines share one buffer: reclaim allocations together with their frame/arena.
+lines :: proc(value: string, width, pixel_size: f32, measure: Measure, data: rawptr = nil, allocator: mem.Allocator = context.temp_allocator) -> []string {
+    result := make([dynamic]string, allocator)
+    buffer := make([]u8, len(value), allocator)
+    used, paragraph_start := 0, 0
+    for paragraph_end in 0 ..= len(value) {
+        if paragraph_end < len(value) && value[paragraph_end] != '\n' {continue}
+        paragraph := value[paragraph_start:paragraph_end]
+        paragraph_start = paragraph_end + 1
+        line_start := used
         for word in strings.fields_iterator(&paragraph) {
-            candidate := word if line == "" else strings.concatenate({line, " ", word}, context.temp_allocator)
-            if line != "" && measure(candidate, pixel_size, data).x > width {
-                append(&result, line)
-                line = ""
+            if used > line_start {buffer[used] = ' '; used += 1}
+            word_start := used
+            used += copy(buffer[used:], word)
+            written := string(buffer[:used])
+            if word_start > line_start && measure(written[line_start:], pixel_size, data).x > width {
+                append(&result, written[line_start:word_start - 1])
+                line_start = word_start
             }
-            if measure(word, pixel_size, data).x <= width {
-                line = word if line == "" else candidate
-                continue
-            }
-            start, end := 0, 0
-            for end < len(word) {
-                following := next(word, end)
-                if end > start && measure(word[start:following], pixel_size, data).x > width {
-                    append(&result, word[start:end])
-                    start = end
+            if measure(word, pixel_size, data).x <= width {continue}
+            end := word_start
+            for end < used {
+                following := next(written, end)
+                if end > line_start && measure(written[line_start:following], pixel_size, data).x > width {
+                    append(&result, written[line_start:end])
+                    line_start = end
                 }
                 end = following
             }
-            remainder := word[start:]
-            line = remainder if line == "" else strings.concatenate({line, " ", remainder}, context.temp_allocator)
         }
-        append(&result, line)
+        append(&result, string(buffer[line_start:used]))
     }
     return result[:]
 }
 
-fit :: proc(value: string, pixel_size, width: f32, suffix: string, measure: Measure, data: rawptr = nil) -> string {
+fit :: proc(value: string, pixel_size, width: f32, suffix: string, measure: Measure, data: rawptr = nil, allocator: mem.Allocator = context.temp_allocator) -> string {
     if measure(value, pixel_size, data).x <= width {return value}
     if measure(suffix, pixel_size, data).x > width {return ""}
+    // Reuse one candidate buffer without assuming character advances are additive.
+    buffer := make([]u8, len(value) + len(suffix), allocator)
     end := 0
     for end < len(value) {
         following := next(value, end)
-        candidate := strings.concatenate({value[:following], suffix}, context.temp_allocator)
-        if measure(candidate, pixel_size, data).x > width {break}
+        copy(buffer[end:following], value[end:following])
+        copy(buffer[following:], suffix)
+        if measure(string(buffer[:following + len(suffix)]), pixel_size, data).x > width {break}
         end = following
     }
-    return strings.concatenate({value[:end], suffix}, context.temp_allocator)
+    copy(buffer[end:], suffix)
+    return string(buffer[:end + len(suffix)])
 }
 
 Selection :: struct {anchor, cursor: int}
 Edit :: enum {insert, backspace, delete_forward, left, right, home, end, select_all}
 
 // Returns frame-allocated text; the application decides whether and how to persist it.
-edit :: proc(value: string, initial: Selection, operation: Edit, inserted: string = "", extend: bool = false) -> (string, Selection) {
+edit :: proc(value: string, initial: Selection, operation: Edit, inserted: string = "", extend: bool = false, allocator: mem.Allocator = context.temp_allocator) -> (string, Selection) {
     selection := Selection{boundary(value, initial.anchor), boundary(value, initial.cursor)}
     first, last := min(selection.anchor, selection.cursor), max(selection.anchor, selection.cursor)
     switch operation {
@@ -97,7 +107,7 @@ edit :: proc(value: string, initial: Selection, operation: Edit, inserted: strin
     case .insert:
     }
     replacement := inserted if operation == .insert else ""
-    changed := strings.concatenate({value[:first], replacement, value[last:]}, context.temp_allocator)
+    changed := strings.concatenate({value[:first], replacement, value[last:]}, allocator)
     cursor := first + len(replacement)
     return changed, {cursor, cursor}
 }

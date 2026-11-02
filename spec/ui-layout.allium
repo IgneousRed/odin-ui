@@ -59,6 +59,9 @@ contract LayoutDefinition {
         -- nodes. It produces no parallel screen-specific layout value, draw list,
         -- hit-region list or action table. After success, the same immutable screen
         -- is sufficient for general drawing and for evaluating the next input.
+        -- Repeating finish is read-only. Builder/action changes after success fail;
+        -- begin starts the next declaration. Prepared text lines are disposable
+        -- derived payloads on these same nodes, not another screen representation.
 
     @invariant PresentedFrameSequence
         -- Input is evaluated against the geometry and actions of the frame the user
@@ -72,6 +75,8 @@ contract LayoutDefinition {
         -- exhaustion of node or depth capacity. Nil means success. Callers may read
         -- finalized rectangles only after success, so failure exposes no partial
         -- layout.
+        -- Failure remains recorded on the frame, and failed or unfinished frames
+        -- cannot supply hits or begin drawing clips.
 }
 
 contract LayoutResolution {
@@ -97,6 +102,8 @@ contract LayoutResolution {
         -- does not know fonts, renderer state or project-specific text semantics.
         -- Multiline content fits every measured line, including ordinary padding
         -- for controls, so scrolling can reach the full content.
+        -- Wrapping derives intrinsic height while preserving declared sizing;
+        -- non-scrolling fit content may compress under AxisResolution.
 
     @invariant GeneralDrawing
         -- Drawing iterates resolved nodes in declaration order and reads only their
