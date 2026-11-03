@@ -4,6 +4,9 @@ cd "$(dirname "$0")/.."
 mkdir -p .work
 work=$(mktemp -d "$PWD/.work/check.XXXXXX")
 trap 'rm -rf "$work"' EXIT
+for script in scripts/*.sh; do
+    sh -n "$script"
+done
 allium check spec/ui-layout.allium
 for package in layout text input raylib; do
     ./scripts/odin.sh check "src/$package" -no-entry-point -vet

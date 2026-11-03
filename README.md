@@ -117,6 +117,10 @@ used by `text.edit`. Pass the returned selection directly to the field options;
 `cursor` separately controls caret visibility. Select all with `{0, len(value)}`
 or the editing helper's `.select_all` operation. Drawing clamps offsets to UTF-8
 codepoint boundaries and places the caret at `selection.cursor`.
+Fields omit their underline when the resolved width leaves no room between the
+text padding.
+Rounded controls cap corner tessellation to bound drawing work for oversized
+geometry, including controls mostly outside the visible clip.
 
 Application state remains authoritative. UI actions carry opaque paths/pointers;
 applications translate those into their own commands and transactions. Persistent
@@ -197,9 +201,11 @@ installed dependencies and download no libraries.
 ./binaries/showcase
 ```
 
-Checks validate the shared Allium specification and run portable tests and raylib
-geometry/text tests without opening a window, plus native and Wasm showcase type
-checks.
+Checks validate shell-script syntax and the shared Allium specification, and run
+portable tests and raylib geometry/text tests without opening a window, plus native
+and Wasm showcase type checks.
+Odin commands use the compiler's `-vet` diagnostics. No separate linter is configured;
+selection remains an open decision in [TODO.md](TODO.md).
 Named regression cases reference the specification's lifecycle, ownership and
 measurement invariants; the specification check itself does not execute the Odin
 implementation. Checks also package the actual release ZIP, verify its checksum,

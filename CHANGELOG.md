@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Omit field underlines when the resolved width cannot contain their text padding.
+- Bound rounded-control tessellation before integer conversion for oversized controls.
+- Include shell-script syntax validation in the standard check suite.
 - Preserve rounded hit regions and drag thresholds at extreme finite scales.
 - Place field selections and carets within their own lines for multiline values.
 - Finalized frames reject subsequent builder/action changes until `begin`;

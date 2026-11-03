@@ -57,6 +57,7 @@ SCROLLBAR_MIN_THUMB :: f32(20)
 TEXT_PADDING_DIVISOR :: f32(8)
 BUTTON_RADIUS_DIVISOR :: f32(4)
 CORNER_SEGMENT_DIVISOR :: f32(2)
+MAX_CORNER_SEGMENTS :: 128
 BORDER_WIDTH :: f32(1)
 BORDER_INSET :: BORDER_WIDTH / 2
 LUMINANCE_RED_WEIGHT :: f32(0.2126)
@@ -331,7 +332,6 @@ begin_clip :: proc(ui: ^UI, index: int, scale: f32 = 1) -> bool {
     if !ui.resolved || index < 0 || index >= ui.count {return false}
     node := &ui.nodes[index]
     clip := intersection(node.clip, node.rect)
-    if clip.width <= 0 || clip.height <= 0 {return false}
     pixels := layout.pixel_bounds(clip, scale)
     if pixels.width <= 0 || pixels.height <= 0 {return false}
     scissor_min := f32(min(i32))
@@ -349,8 +349,9 @@ draw :: proc(ui: ^UI, scale: f32 = 1) {
 	assert(ui.failure == nil && ui.resolved)
 	for &node, index in ui.nodes[:ui.count] {
 		if !begin_clip(ui, index, scale) {continue}
+		// Successful clipping guarantees positive node dimensions.
 		if style := node.style; style.background.a > 0 {
-            if style.radius > 0 && node.rect.width > 0 && node.rect.height > 0 {
+            if style.radius > 0 {
                 rl.DrawRectangleRounded(raylib_rect(node.rect), min(1, 2 * style.radius / min(node.rect.width, node.rect.height)), BACKGROUND_CORNER_SEGMENTS, style.background)
             } else {rl.DrawRectangleRec(raylib_rect(node.rect), style.background)}
         }
@@ -378,23 +379,22 @@ draw :: proc(ui: ^UI, scale: f32 = 1) {
 			background := content.pressed_background if content.pressed else content.background
 			foreground := button_foreground(background)
 			// Draw the fill and inside border before text overlays.
-			if node.rect.width > 0 && node.rect.height > 0 {
-				box := raylib_rect(node.rect)
-				radius := clamp(node.style.radius, 0, min(node.rect.width, node.rect.height) / 2)
-				segments := c.int(radius / CORNER_SEGMENT_DIVISOR) + 1
-				roundness := radius * 2 / min(node.rect.width, node.rect.height)
-				rl.DrawRectangleRounded(box, roundness, segments, background)
-				border_box := rl.Rectangle {
-					box.x + BORDER_INSET,
-					box.y + BORDER_INSET,
-					box.width - BORDER_WIDTH,
-					box.height - BORDER_WIDTH,
-				}
-				if border_box.width > 0 && border_box.height > 0 {
-					border_radius := max(0, radius - BORDER_INSET)
-					border_roundness := border_radius * 2 / min(border_box.width, border_box.height)
-					rl.DrawRectangleRoundedLinesEx(border_box, border_roundness, segments, BORDER_WIDTH, foreground)
-				}
+			box := raylib_rect(node.rect)
+			radius := clamp(node.style.radius, 0, min(node.rect.width, node.rect.height) / 2)
+			// Scissoring does not bound raylib's CPU tessellation; cap before conversion.
+			segments := c.int(min(radius / CORNER_SEGMENT_DIVISOR + 1, f32(MAX_CORNER_SEGMENTS)))
+			roundness := radius * 2 / min(node.rect.width, node.rect.height)
+			rl.DrawRectangleRounded(box, roundness, segments, background)
+			border_box := rl.Rectangle {
+				box.x + BORDER_INSET,
+				box.y + BORDER_INSET,
+				box.width - BORDER_WIDTH,
+				box.height - BORDER_WIDTH,
+			}
+			if border_box.width > 0 && border_box.height > 0 {
+				border_radius := max(0, radius - BORDER_INSET)
+				border_roundness := border_radius * 2 / min(border_box.width, border_box.height)
+				rl.DrawRectangleRoundedLinesEx(border_box, border_roundness, segments, BORDER_WIDTH, foreground)
 			}
 			selection := text_core.Selection{
 				anchor = text_boundary(content.value, content.selection.anchor),
@@ -429,7 +429,8 @@ draw :: proc(ui: ^UI, scale: f32 = 1) {
 			}
 			rl.DrawTextCodepoints(content.font, raw_data(runes), c.int(len(runes)), origin, content.pixel_size, 0, foreground)
 			padding := control_padding(content.pixel_size)
-			if content.underline {
+			// A compressed field may have no room between its text padding.
+			if content.underline && node.rect.width > padding * 2 {
 				y := node.rect.y + node.rect.height - BORDER_WIDTH - padding
 				rl.DrawRectangleRec({node.rect.x + padding, y, node.rect.width - padding * 2, BORDER_WIDTH}, foreground)
 			}

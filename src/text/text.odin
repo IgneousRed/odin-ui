@@ -16,7 +16,7 @@ boundary :: proc(value: string, desired: int) -> int {
 }
 
 previous :: proc(value: string, position: int) -> int {
-    return boundary(value, max(0, boundary(value, position) - 1))
+    return boundary(value, boundary(value, position) - 1)
 }
 
 next :: proc(value: string, position: int) -> int {

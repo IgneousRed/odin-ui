@@ -23,7 +23,7 @@ pointer :: proc(previous, mouse: Pointer, touches: []Touch = nil, focused: bool 
         }
         if previous.down && selected.id != previous.id {return {id = previous.id, position = previous.position, cancelled = true}}
         return {position = logical_position({scale = scale}, selected.position), id = selected.id,
-                pressed = !previous.down || previous.id != selected.id, down = true}
+                pressed = !previous.down, down = true}
     }
     if previous.down && previous.id >= 0 {return {id = previous.id, position = previous.position, released = true}}
     result := mouse

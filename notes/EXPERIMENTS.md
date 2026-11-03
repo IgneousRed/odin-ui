@@ -72,3 +72,77 @@ No dependency changes were needed. Packaging failure probes preserved previous
 outputs through ZIP creation, ZIP validation and checksum generation failures.
 The two final file moves do not publish an atomic ZIP/checksum pair; a failure
 there stops the consumer check, and checksum verification rejects a stale pair.
+
+## 2026-11-03 coding-skill audit
+
+Audited the tracked implementation, hosts, tests, specification, scripts, CI,
+documentation and project records from clean commit
+`f6018a2c13c30376a77244e3f2f4a9e3f575309e` against the installed Coding skill and
+AGENTS.md. The skill's prescribed source-role folders and initial project records
+apply to new projects; they do not require restructuring this existing library.
+The project's explicit exclusion of application stores, persistence, migration
+and recovery applies. Caller-owned capture state, borrowed triggers, node storage
+and presentation/scratch lifetimes remain subject to the documented contracts.
+
+Retained the portable layout/text/input packages and raylib I/O boundary. Frames
+use indexed relationships and reconstructible geometry/text preparation, with
+caller-selected allocators and reusable node storage. The earlier SoA experiment
+already records its API/maintenance cost; this audit found no new workload evidence
+to justify that change. No dependencies, external database schemas or vendored
+assets changed. Existing unrelated scratch/recovery artifacts were preserved.
+
+Fixed a narrow field emitting a negative-width underline: a headless capture of
+actual drawing calls reproduced width `-1.5` for a field of width `1` at text size
+`10`. The same probe passed widths `0`, `1`, `2.5`, `4` and `100` after the fix.
+Ten multiline/UTF-8 field-overlay capture cases also passed, with empty and
+newline-only fields now correctly omitting their zero-width underline. These
+are boundary-call checks using the existing raylib shared library, not GPU or
+graphical interaction evidence. The capture setup must select `RAYLIB_SHARED=true`;
+static linking conflicts with the replacement drawing symbols.
+
+The complete standard suite passed all 46 tests, Allium validation, native/Wasm
+compiler `-vet` checks and the packaged-source consumer run/check. Shell syntax
+validation now runs in that suite. Both debug showcases built, including the web
+link with the existing Emscripten 6.0.13 and raylib 6.2 installations. Node syntax
+checks passed for the JS library and inline HTML script. The font binary matched
+its manifest SHA-256. No graphical playtest or cross-platform runtime claim is
+made by this audit. Separate linter selection and external-review policy remain
+open in TODO.md; neither a new dependency nor an external-review gate was assumed.
+
+## 2026-11-03 sol-finish validation
+
+Three `gpt-6.1-sol` agents at high reasoning effort reviewed and simplified the
+portable core, raylib adapter, and showcase/tooling/docs. Three fresh agents then
+reviewed those same boundaries for bugs, followed by parent intersection review.
+Kept the compact package and script boundaries. Removed repeated checks already
+established by touch cancellation, UTF-8 boundary clamping and successful drawing
+clips; retained the independent inset-border and narrow-field underline guards.
+The portable reviewer compared 61 UTF-8 boundary cases and 240 pointer snapshots
+with the previous expressions; every result matched.
+
+The raylib bug review reproduced unbounded rounded-control tessellation: a valid
+oversized button clipped to a 100-by-100 viewport supplied 1,250,000,001 segments
+at text size `1e10`, and a larger value converted to a negative segment count.
+Scissoring limits rasterization, but raylib still loops through the requested
+segments on the CPU. Cap the count at 128 before integer conversion for both fill
+and border. Ordinary controls keep their existing count; very large corners trade
+additional tessellation detail for bounded work. Ten draw-capture cases from text
+size `10` through `1e30` passed explicit expected counts after the fix.
+
+Official upstream metadata still matched the existing [Odin dev-2026-10](https://github.com/odin-lang/Odin/releases/tag/dev-2026-10),
+[Allium 3.6.1](https://github.com/juxt/allium-tools/releases/tag/v3.6.1),
+[raylib 6.2](https://github.com/raysan5/raylib/releases/tag/6.2),
+[Emscripten 6.0.13](https://raw.githubusercontent.com/emscripten-core/emsdk/main/emscripten-releases-tags.json),
+and [checkout v7.0.1](https://github.com/actions/checkout/releases/tag/v7.0.1)
+pins. The CI archive digests and checkout commit matched upstream metadata, and
+the current upstream font binary matched the vendored SHA-256. No dependency
+update or permission request was necessary.
+
+Final combined verification passed the complete 46-test suite, shell syntax,
+Allium contract validation, native/Wasm compiler `-vet` checks and packaged-source
+consumer execution/check. Both desktop and web debug showcases built. All 25
+focused drawing captures passed (five narrow fields, ten field overlays and ten
+tessellation limits); the JS library and inline HTML script passed Node syntax
+checks. These results establish local build and headless behavior, not graphical
+playtesting or execution of the Ubuntu CI job. No separate linter is configured;
+its selection and the general external-review policy remain open in TODO.md.
