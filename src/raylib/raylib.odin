@@ -96,10 +96,11 @@ rounded_rect_contains :: proc(point: rl.Vector2, rect: Layout_Rect, radius: f32)
 }
 text :: proc(ui: ^UI, font: rl.Font, value: string, pixel_size: f32, color: rl.Color, options: Text_Options = {}) -> int {
     size := measure_text(font, value, pixel_size)
+    size.y = max(pixel_size, size.y)
     width, height := options.width, options.height
     if width == nil {width = fixed(size.x)}
-    if height == nil {height = fixed(max(pixel_size, size.y))}
-    index := layout_leaf(ui, {width = width, height = height})
+    if height == nil {height = fixed(size.y)}
+    index := layout_leaf(ui, {width = width, height = height}, {size.x, size.y})
     if index >= 0 {ui.nodes[index].content = Layout_Text{value = strings.clone(value, ui.allocator), font = font, pixel_size = pixel_size, color = color, centered = true}}
     return index
 }
@@ -251,11 +252,12 @@ button :: proc(
 	options: Button_Options = {},
 ) -> int {
 	size := measure_text(font, value, pixel_size)
+	size = {control_width(size.x, pixel_size), max(pixel_size, size.y) + control_padding(pixel_size) * 2}
 	resolved_width := options.width
 	resolved_height := options.height
-	if resolved_width == nil do resolved_width = fixed(control_width(size.x, pixel_size))
-	if resolved_height == nil do resolved_height = fixed(max(pixel_size, size.y) + control_padding(pixel_size) * 2)
-	index := layout_leaf(ui, {width = resolved_width, height = resolved_height, radius = button_radius(pixel_size)})
+	if resolved_width == nil do resolved_width = fixed(size.x)
+	if resolved_height == nil do resolved_height = fixed(size.y)
+	index := layout_leaf(ui, {width = resolved_width, height = resolved_height, radius = button_radius(pixel_size)}, {size.x, size.y})
 	if index >= 0 {
 		ui.nodes[index].trigger = trigger
 		ui.nodes[index].content = Layout_Button {

@@ -5,6 +5,43 @@ import text "../../src/text"
 import "core:testing"
 import rl "vendor:raylib"
 
+@(test)
+growing_labels_and_controls_start_at_their_measured_content_size :: proc(t: ^testing.T) {
+    font := monospace_font()
+    for control in 0 ..< 3 {
+        frame: imui.UI
+        imui.begin(&frame, 100, 40, {alignment = {.start, .start}})
+        nodes: [2]int
+        for value, index in ([2]string{"A", "Widest"}) {
+            switch control {
+            case 0: nodes[index] = imui.text(&frame, font, value, 10, rl.WHITE, {width = imui.grow()})
+            case 1: nodes[index] = imui.button(&frame, font, value, 10, rl.BLUE, rl.DARKBLUE, {}, {width = imui.grow()})
+            case 2: nodes[index] = imui.field(&frame, font, value, 10, rl.BLUE, rl.DARKBLUE, {}, {width = imui.grow()})
+            }
+        }
+        testing.expect(t, imui.finish(&frame) == nil)
+        testing.expect_value(t, frame.nodes[nodes[0]].rect.width, f32(25))
+        testing.expect_value(t, frame.nodes[nodes[1]].rect.width, f32(75))
+    }
+}
+
+@(test)
+explicit_control_dimensions_do_not_hide_invalid_text_measurements :: proc(t: ^testing.T) {
+    font := monospace_font()
+    for control in 0 ..< 3 {
+        for size in ([4]f32{-1, transmute(f32)u32(0x7fc00000), transmute(f32)u32(0x7f800000), 1e38}) {
+            frame: imui.UI
+            imui.begin(&frame, 100, 40)
+            switch control {
+            case 0: imui.text(&frame, font, "Widest", size, rl.WHITE, {width = imui.fixed(20), height = imui.fixed(20)})
+            case 1: imui.button(&frame, font, "Widest", size, rl.BLUE, rl.DARKBLUE, {}, {width = imui.fixed(20), height = imui.fixed(20)})
+            case 2: imui.field(&frame, font, "Widest", size, rl.BLUE, rl.DARKBLUE, {}, {width = imui.fixed(20), height = imui.fixed(20)})
+            }
+            testing.expect(t, imui.finish(&frame) != nil)
+        }
+    }
+}
+
 // -------------------------------- Public --------------------------------
 
 // ---------------- Procedures ----------------

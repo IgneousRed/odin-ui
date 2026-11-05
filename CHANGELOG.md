@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Use measured label/control dimensions as intrinsic sizes for explicit grow sizing;
+  reject invalid measurements even when callers override both dimensions.
 - Reserve fixed children and gaps before compressing fit/grow content, preserving
   the available space even when intrinsic sizes are much larger than the viewport.
 - Truncate to the longest fitting UTF-8 prefix even when shaping makes candidate
