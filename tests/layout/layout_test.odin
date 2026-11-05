@@ -6,6 +6,23 @@ import "core:testing"
 Frame :: ui.Frame(int, u32)
 
 @(test)
+compression_reserves_fixed_children_and_gaps_at_large_size_ratios :: proc(t: ^testing.T) {
+    for horizontal in ([2]bool{false, true}) {
+        for grow in ([2]bool{false, true}) {
+            frame: Frame
+            ui.begin(&frame, 100, 100, {direction = .horizontal if horizontal else .vertical, gap = 5})
+            fixed := ui.leaf(&frame, {width = ui.fixed(10), height = ui.fixed(10)})
+            content := ui.leaf(&frame, {width = ui.grow() if grow else nil, height = ui.grow() if grow else nil}, {1e10, 1e10})
+            testing.expect(t, ui.finish(&frame) == nil)
+            expected_fixed := ui.Rect{0, 45, 10, 10} if horizontal else ui.Rect{45, 0, 10, 10}
+            expected_content := ui.Rect{15, 0, 85, 100} if horizontal else ui.Rect{0, 15, 100, 85}
+            testing.expect_value(t, frame.nodes[fixed].rect, expected_fixed)
+            testing.expect_value(t, frame.nodes[content].rect, expected_content)
+        }
+    }
+}
+
+@(test)
 rounded_hits_preserve_corners_at_extreme_finite_scales :: proc(t: ^testing.T) {
     for extent in ([2]f32{1e20, 1e-25}) {
         frame: Frame

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reserve fixed children and gaps before compressing fit/grow content, preserving
+  the available space even when intrinsic sizes are much larger than the viewport.
 - Truncate to the longest fitting UTF-8 prefix even when shaping makes candidate
   widths nonmonotonic or makes the suffix alone wider than a combined candidate.
 - Omit field underlines when the resolved width cannot contain their text padding.

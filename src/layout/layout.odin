@@ -239,32 +239,35 @@ position :: proc(frame: ^Frame($Content, $Color)) {
         available_height := max(0, node.rect.height - padding.top - padding.bottom)
         available_main := available_width if horizontal else available_height
         available_cross := available_height if horizontal else available_width
-        used: f32
-        compressible: f32
+        rigid, compressible: f32
         grow_count := 0
         children := 0
         for child := node.first_child; child >= 0; child = frame.nodes[child].next_sibling {
             item := &frame.nodes[child]
             main := item.measured_width if horizontal else item.measured_height
-            used += main
             sizing := item.style.width if horizontal else item.style.height
             if _, grows := sizing.(Grow); grows {
                 grow_count += 1
             }
-            if _, fixed := sizing.(Fixed); !fixed {
+            if _, fixed := sizing.(Fixed); fixed {
+                rigid += main
+            } else {
                 compressible += main
             }
             children += 1
         }
-        used += style.gap * f32(children - 1)
+        // Reserve fixed sizes and gaps directly; subtracting large content totals
+        // from each other can erase the smaller space available for compression.
+        rigid += style.gap * f32(children - 1)
+        available_content := max(0, available_main - rigid)
         share: f32
         compression := f32(1)
-        if grow_count > 0 && available_main > used {
-            share = (available_main - used) / f32(grow_count)
-        } else if available_main < used && compressible > 0 && !style.scroll {
-            compression = max(0, (compressible - (used - available_main)) / compressible)
+        if grow_count > 0 && available_content > compressible {
+            share = (available_content - compressible) / f32(grow_count)
+        } else if available_content < compressible && !style.scroll {
+            compression = available_content / compressible
         }
-        resolved_main := used - compressible + compressible * compression + share * f32(grow_count)
+        resolved_main := rigid + compressible * compression + share * f32(grow_count)
         node.max_scroll = max(0, resolved_main - available_main) if style.scroll else 0
         remaining_main := available_main - resolved_main
         main_alignment := style.alignment.horizontal if horizontal else style.alignment.vertical
