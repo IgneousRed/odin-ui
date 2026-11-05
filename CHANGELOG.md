@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Bound stale scroll offsets before wheel input and capture, avoiding a dead zone
+  when dragging or scrolling back from a reduced content extent.
 - Round calculated color channels to the nearest byte, preserving RGB/HSL round
   trips and blends of a color with itself instead of losing channel values.
 - Wrap HSL hue angles in both directions and interpolate alpha in HSL blends.

@@ -148,7 +148,9 @@ reclaim the allocator as a whole rather than freeing individual line substrings.
 
 Input helpers expect finite logical dimensions, nonnegative insets and drag
 thresholds, and finite offsets, wheel deltas and scroll limits. A nonpositive DPI
-scale means 1. `input.pointer` derives a logical pointer from a mouse sample and
+scale means 1. `input.scroll` bounds the current offset before applying wheel
+input or starting a drag, including when the content extent has shrunk.
+`input.pointer` derives a logical pointer from a mouse sample and
 touch samples without polling devices; mouse ID is -1 and touch IDs are
 nonnegative. The raylib `pointer` helper only collects those samples and delegates
 capture continuity and coordinate conversion to that portable function.

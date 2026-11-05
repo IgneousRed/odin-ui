@@ -4,6 +4,36 @@ import input "../../src/input"
 import "core:testing"
 
 @(test)
+scroll_capture_starts_from_the_current_bounded_offset :: proc(t: ^testing.T) {
+    for horizontal in ([2]bool{false, true}) {
+        for current in ([2]f32{-200, 200}) {
+            state: input.Scroll
+            offset, dragging := input.scroll(&state, {id = 1, position = {100, 100}, pressed = true, down = true},
+                                             true, current, 100, 0, horizontal)
+            start := f32(0) if current < 0 else f32(100)
+            testing.expect_value(t, offset, start)
+            testing.expect(t, !dragging)
+            position := f32(80) if current < 0 else f32(120)
+            offset, dragging = input.scroll(&state, {id = 1, position = {position, position}, down = true},
+                                             true, offset, 100, 0, horizontal)
+            testing.expect_value(t, offset, f32(20) if current < 0 else f32(80))
+            testing.expect(t, dragging)
+        }
+    }
+}
+
+@(test)
+wheel_scrolling_applies_to_the_current_bounded_offset :: proc(t: ^testing.T) {
+    state: input.Scroll
+    offset, _ := input.scroll(&state, {}, true, 200, 100, -20)
+    testing.expect_value(t, offset, f32(80))
+    offset, _ = input.scroll(&state, {}, true, -200, 100, 20)
+    testing.expect_value(t, offset, f32(20))
+    offset, _ = input.scroll(&state, {}, true, 200, -100, 20)
+    testing.expect_value(t, offset, f32(0))
+}
+
+@(test)
 drag_thresholds_preserve_clicks_at_extreme_finite_scales :: proc(t: ^testing.T) {
     for threshold in ([2]f32{1e20, 1e-25}) {
         capture: input.Press

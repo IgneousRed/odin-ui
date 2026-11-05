@@ -78,17 +78,19 @@ button :: proc(state: ^Press, pointer: Pointer, inside: bool, drag_threshold: f3
 Scroll :: struct {press: Press, origin_offset: f32}
 
 scroll :: proc(state: ^Scroll, pointer: Pointer, inside: bool, current, maximum, wheel: f32, horizontal: bool = false, drag_threshold: f32 = DRAG_THRESHOLD) -> (offset: f32, dragging: bool) {
+    limit := max(0, maximum)
+    // A changed content extent may leave the caller's old offset outside the range.
+    offset = clamp(current, 0, limit)
     // Keep the old origin through release; button clears its capture on release.
     origin := state.press.origin
     event := button(&state.press, pointer, inside, drag_threshold)
-    if event.pressed {state.origin_offset = current; origin = pointer.position}
-    offset = current
+    if event.pressed {state.origin_offset = offset; origin = pointer.position}
     if inside {offset += wheel}
     if event.dragging {
         delta := pointer.position.x - origin.x if horizontal else pointer.position.y - origin.y
         offset = state.origin_offset - delta
     }
-    return clamp(offset, 0, max(0, maximum)), event.dragging
+    return clamp(offset, 0, limit), event.dragging
 }
 
 focus_next :: proc(current: int, enabled: []int, backwards: bool = false) -> int {
