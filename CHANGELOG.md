@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Truncate to the longest fitting UTF-8 prefix even when shaping makes candidate
+  widths nonmonotonic or makes the suffix alone wider than a combined candidate.
 - Omit field underlines when the resolved width cannot contain their text padding.
 - Bound rounded-control tessellation before integer conversion for oversized controls.
 - Include shell-script syntax validation in the standard check suite.

@@ -65,19 +65,15 @@ lines :: proc(value: string, width, pixel_size: f32, measure: Measure, data: raw
 
 fit :: proc(value: string, pixel_size, width: f32, suffix: string, measure: Measure, data: rawptr = nil, allocator: mem.Allocator = context.temp_allocator) -> string {
     if measure(value, pixel_size, data).x <= width {return value}
-    if measure(suffix, pixel_size, data).x > width {return ""}
-    // Reuse one candidate buffer without assuming character advances are additive.
+    // Search longest-first: shaping can make candidate widths nonmonotonic.
     buffer := make([]u8, len(value) + len(suffix), allocator)
-    end := 0
-    for end < len(value) {
-        following := next(value, end)
-        copy(buffer[end:following], value[end:following])
-        copy(buffer[following:], suffix)
-        if measure(string(buffer[:following + len(suffix)]), pixel_size, data).x > width {break}
-        end = following
+    copy(buffer, value)
+    for end := len(value); ; end = previous(value, end) {
+        copy(buffer[end:], suffix)
+        candidate := string(buffer[:end + len(suffix)])
+        if measure(candidate, pixel_size, data).x <= width {return candidate}
+        if end == 0 {return ""}
     }
-    copy(buffer[end:], suffix)
-    return string(buffer[:end + len(suffix)])
 }
 
 Selection :: struct {anchor, cursor: int}

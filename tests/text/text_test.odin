@@ -74,6 +74,24 @@ truncation_measures_the_actual_suffix_candidate :: proc(t: ^testing.T) {
     testing.expect_value(t, text.fit("é🙂abc", 10, 35, "…", monospace), "é🙂…")
 }
 
+// Shaping can make a longer candidate narrower, even than the suffix alone.
+contracting_measure :: proc(value: string, size: f32, data: rawptr) -> layout.Vec2 {
+    switch value {
+    case "…": return {20, size}
+    case "é🙂…": return {10, size}
+    case: return {100, size}
+    }
+}
+
+@(test)
+truncation_finds_the_longest_fitting_prefix_without_monotonic_widths :: proc(t: ^testing.T) {
+    for width in ([2]f32{15, 25}) {
+        testing.expect_value(t, text.fit("é🙂abc", 10, width, "…", contracting_measure), "é🙂…")
+        testing.expect_value(t, text.fit("é🙂", 10, width, "…", contracting_measure), "é🙂…")
+    }
+    testing.expect_value(t, text.fit("é🙂abc", 10, 5, "…", contracting_measure), "")
+}
+
 @(test)
 wrapping_measures_whole_runs_when_splitting_words :: proc(t: ^testing.T) {
     lines := text.lines(" AV  AVAV\tX ", 25, 10, kerning)
