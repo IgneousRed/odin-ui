@@ -122,6 +122,10 @@ text padding.
 Rounded controls cap corner tessellation to bound drawing work for oversized
 geometry, including controls mostly outside the visible clip.
 
+`hsl` and `hsl_color` wrap hue angles in degrees and expect saturation/lightness
+in `[0, 1]`. `hsl_blend` takes an amount in `[0, 1]`, follows the shorter hue arc
+and linearly interpolates alpha along with the color.
+
 Application state remains authoritative. UI actions carry opaque paths/pointers;
 applications translate those into their own commands and transactions. Persistent
 scroll, focus and text selections remain caller-owned. UTF-8 editing is by

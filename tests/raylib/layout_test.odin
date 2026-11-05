@@ -93,6 +93,18 @@ wrapped_text_uses_resolved_width_and_rune_boundaries :: proc(t: ^testing.T) {
 }
 
 @(test)
+single_line_paragraphs_preserve_small_positive_heights :: proc(t: ^testing.T) {
+    font := monospace_font()
+    for size in ([3]f32{1e-7, 1e-10, 1e-25}) {
+        frame: imui.UI
+        imui.begin(&frame, 100, 100, {direction = .vertical, alignment = {.start, .start}})
+        node := imui.paragraph(&frame, font, "a", size, rl.WHITE)
+        testing.expect(t, imui.finish(&frame) == nil)
+        testing.expect_value(t, frame.nodes[node].rect.height, size)
+    }
+}
+
+@(test)
 presented_text_owns_a_copy_of_transaction_rows :: proc(t: ^testing.T) {
     frame: imui.UI
     source: [8]u8

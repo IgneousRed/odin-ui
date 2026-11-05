@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Wrap HSL hue angles in both directions and interpolate alpha in HSL blends.
+- Preserve small positive paragraph heights by counting line gaps directly.
 - Use measured label/control dimensions as intrinsic sizes for explicit grow sizing;
   reject invalid measurements even when callers override both dimensions.
 - Reserve fixed children and gaps before compressing fit/grow content, preserving

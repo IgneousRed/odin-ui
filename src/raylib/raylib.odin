@@ -81,7 +81,8 @@ finish :: proc(ui: ^UI) -> Layout_Failure {
             // Retain the derived lines for drawing; declared fit/fixed sizing stays intact.
             content.wrapped_lines = text_lines(content, node.rect.width, ui.allocator)
             node.content = content
-            node.intrinsic.y = f32(len(content.wrapped_lines)) * (content.pixel_size + TEXT_LINE_GAP) - TEXT_LINE_GAP
+            line_count := len(content.wrapped_lines)
+            node.intrinsic.y = f32(line_count) * content.pixel_size + f32(line_count - 1) * TEXT_LINE_GAP
         }
     }
     if !wrapped {return nil}
@@ -154,9 +155,11 @@ hsl_color :: proc(value: HSL) -> rl.Color {
 	return hsl(value.hue, value.saturation, value.lightness)
 }
 
+// Hue wraps in degrees; saturation and lightness are in [0, 1].
 hsl :: proc(hue, saturation, lightness: f32) -> rl.Color {
 	chroma := (1 - math.abs(2 * lightness - 1)) * saturation
-	sector := hue / HSL_SECTOR_DEGREES
+	sector := math.mod(hue, 360) / HSL_SECTOR_DEGREES
+	if sector < 0 {sector += 6}
 	offset := chroma * (1 - math.abs(math.mod(sector, 2) - 1))
 	red, green, blue: f32
 	switch {
@@ -182,12 +185,15 @@ hsl :: proc(hue, saturation, lightness: f32) -> rl.Color {
 	}
 }
 
+// Amount is in [0, 1]. Blend along the shorter hue arc, with linear opacity.
 hsl_blend :: proc(from, to: rl.Color, amount: f32) -> rl.Color {
 	start, end := color_hsl(from), color_hsl(to)
 	if start.saturation == 0 do start.hue = end.hue
 	if end.saturation == 0 do end.hue = start.hue
 	delta := math.mod(end.hue - start.hue + 540, 360) - 180
-	return hsl(math.mod(start.hue + delta * amount + 360, 360), start.saturation + (end.saturation - start.saturation) * amount, start.lightness + (end.lightness - start.lightness) * amount)
+	color := hsl(start.hue + delta * amount, start.saturation + (end.saturation - start.saturation) * amount, start.lightness + (end.lightness - start.lightness) * amount)
+	color.a = u8(f32(from.a) + (f32(to.a) - f32(from.a)) * amount)
+	return color
 }
 
 text_pixels :: proc(point: f32) -> f32 {
