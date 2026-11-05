@@ -177,10 +177,11 @@ hsl :: proc(hue, saturation, lightness: f32) -> rl.Color {
 		red, blue = chroma, offset
 	}
 	match := lightness - chroma / 2
+	// Quantize to the nearest byte; truncation loses channels on RGB/HSL round trips.
 	return {
-		u8((red + match) * COLOR_CHANNEL_MAX),
-		u8((green + match) * COLOR_CHANNEL_MAX),
-		u8((blue + match) * COLOR_CHANNEL_MAX),
+		u8(math.round(clamp(red + match, 0, 1) * COLOR_CHANNEL_MAX)),
+		u8(math.round(clamp(green + match, 0, 1) * COLOR_CHANNEL_MAX)),
+		u8(math.round(clamp(blue + match, 0, 1) * COLOR_CHANNEL_MAX)),
 		u8(COLOR_CHANNEL_MAX),
 	}
 }
@@ -192,7 +193,7 @@ hsl_blend :: proc(from, to: rl.Color, amount: f32) -> rl.Color {
 	if end.saturation == 0 do end.hue = start.hue
 	delta := math.mod(end.hue - start.hue + 540, 360) - 180
 	color := hsl(start.hue + delta * amount, start.saturation + (end.saturation - start.saturation) * amount, start.lightness + (end.lightness - start.lightness) * amount)
-	color.a = u8(f32(from.a) + (f32(to.a) - f32(from.a)) * amount)
+	color.a = u8(math.round(f32(from.a) + (f32(to.a) - f32(from.a)) * amount))
 	return color
 }
 

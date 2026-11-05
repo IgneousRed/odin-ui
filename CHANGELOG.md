@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Round calculated color channels to the nearest byte, preserving RGB/HSL round
+  trips and blends of a color with itself instead of losing channel values.
 - Wrap HSL hue angles in both directions and interpolate alpha in HSL blends.
 - Preserve small positive paragraph heights by counting line gaps directly.
 - Use measured label/control dimensions as intrinsic sizes for explicit grow sizing;

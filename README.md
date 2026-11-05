@@ -124,7 +124,8 @@ geometry, including controls mostly outside the visible clip.
 
 `hsl` and `hsl_color` wrap hue angles in degrees and expect saturation/lightness
 in `[0, 1]`. `hsl_blend` takes an amount in `[0, 1]`, follows the shorter hue arc
-and linearly interpolates alpha along with the color.
+and linearly interpolates alpha along with the color. Calculated color channels
+round to the nearest byte.
 
 Application state remains authoritative. UI actions carry opaque paths/pointers;
 applications translate those into their own commands and transactions. Persistent

@@ -5,6 +5,20 @@ import "core:testing"
 import rl "vendor:raylib"
 
 @(test)
+hsl_round_trips_preserve_byte_colors :: proc(t: ^testing.T) {
+    channels := [9]u8{0, 1, 31, 63, 127, 128, 191, 254, 255}
+    for red in channels {
+        for green in channels {
+            for blue in channels {
+                color := rl.Color{red, green, blue, 255}
+                if !testing.expect_value(t, ui.hsl_color(ui.color_hsl(color)), color) {return}
+                if !testing.expect_value(t, ui.hsl_blend(color, color, 0.5), color) {return}
+            }
+        }
+    }
+}
+
+@(test)
 hsl_hues_wrap_in_both_directions :: proc(t: ^testing.T) {
     primaries := [6]rl.Color{{255, 0, 0, 255}, {255, 255, 0, 255}, {0, 255, 0, 255},
                             {0, 255, 255, 255}, {0, 0, 255, 255}, {255, 0, 255, 255}}
@@ -25,4 +39,5 @@ hsl_blends_preserve_and_interpolate_opacity :: proc(t: ^testing.T) {
     testing.expect_value(t, ui.hsl_blend(start, end, 1), end)
     testing.expect_value(t, ui.hsl_blend(start, end, 0.5), {255, 0, 255, 128})
     testing.expect_value(t, ui.hsl_blend({0, 0, 0, 0}, {0, 0, 0, 0}, 0.5), {})
+    testing.expect_value(t, ui.hsl_blend({255, 0, 0, 0}, {255, 0, 0, 255}, 0.5), {255, 0, 0, 128})
 }
