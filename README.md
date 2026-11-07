@@ -40,7 +40,7 @@ Build normally with `odin build src`. You can instead use
 `odin build src -collection:odin_ui=vendor/odin_ui`. Both forms use the same
 copied sources. The package table above uses collection notation for brevity.
 
-Version `0.1.1` is an early release; the API may change before 1.0. Read the
+Version `0.1.2` is an early release; the API may change before 1.0. Read the
 [changelog](CHANGELOG.md) before updating your copy.
 
 ## Import and ownership
@@ -175,20 +175,22 @@ this extraction; it requires its own raylib host and target validation.
 
 ## Checks and showcase
 
-The working toolchain for the first version is:
+The development check toolchain is:
 
 | Tool | Tested version | Source |
 | --- | --- | --- |
-| Odin | `dev-2026-10:84bc3fc21` | [October release](https://github.com/odin-lang/Odin/releases/tag/dev-2026-10), [installation guide](https://odin-lang.org/docs/install/) |
+| Odin | `dev-2026-11a`, compiler `9a6991685` (also printed as `9a69916`) | [November release](https://github.com/odin-lang/Odin/releases/tag/dev-2026-11a), [installation guide](https://odin-lang.org/docs/install/) |
+| Shared Odin linter runner | Python 3.9+ standard library, Git, authenticated GitHub access | [Pinned integration contract](https://github.com/IgneousRed/odin-lint/blob/289dc4e0812f108296143f60ac9e1136eec76d17/docs/integration.md) |
 | Allium CLI | `3.6.1`, including language version 3 | [Release binaries](https://github.com/juxt/allium-tools/releases/tag/v3.6.1), [installation guide](https://github.com/juxt/allium-tools#install-the-cli) |
 | Desktop raylib | `6.2` on macOS ARM64 | Linked through Odin's `vendor:raylib` collection; the tested Homebrew Odin package supplies bindings and links Homebrew raylib |
 | Emscripten (web builds) | `6.0.13` | [SDK installation guide](https://emscripten.org/docs/getting_started/downloads.html) |
 | Web raylib | `6.2`, static, OpenGL ES 2 | [Tagged source](https://github.com/raysan5/raylib/tree/6.2) |
 
 GitHub Actions runs the complete check suite on Ubuntu 24.04 using the official
-Odin `dev-2026-10` archive (including its bundled raylib) and Allium `3.6.1`.
+Odin `dev-2026-11a` archive (including its bundled raylib) and Allium `3.6.1`.
 Downloaded tool archives are verified by SHA-256. The desktop and linked web
-showcase were also exercised with the macOS toolchain listed above.
+showcase were previously exercised with Odin `dev-2026-10:84bc3fc21` on macOS;
+the current check suite does not link or playtest the web showcase.
 
 Install Odin and Allium using the linked upstream instructions, put their
 executables on `PATH`, and confirm `odin version` and `allium --version` before
@@ -211,8 +213,10 @@ installed dependencies and download no libraries.
 Checks validate shell-script syntax and the shared Allium specification, and run
 portable tests and raylib geometry/text tests without opening a window, plus native
 and Wasm showcase type checks.
-Odin commands use the compiler's `-vet` diagnostics. No separate linter is configured;
-selection remains an open decision in [TODO.md](TODO.md).
+Odin commands use the compiler's `-vet` diagnostics. After editing code, run
+`./scripts/check.sh` before completing the change: all applicable Odin compiler
+checks must pass before the GitHub-pinned shared Odin linter runs. Every shared
+rule runs; setup or analysis failure is not a pass.
 Named regression cases reference the specification's lifecycle, ownership and
 measurement invariants; the specification check itself does not execute the Odin
 implementation. Checks also package the actual release ZIP, verify its checksum,
@@ -220,6 +224,81 @@ extract it into a separate consumer project, run a headless native program and
 check the Wasm target using only the copied packages and ordinary Odin commands.
 Consumer projects validate their own code and application integration; they do
 not invoke this repository’s check suite.
+
+### Shared Odin linting
+
+[`odin-lint.lock.json`](odin-lint.lock.json) pins
+[`IgneousRed/odin-lint`](https://github.com/IgneousRed/odin-lint) to full commit
+`289dc4e0812f108296143f60ac9e1136eec76d17`.
+[`tools/run-odin-lint.py`](tools/run-odin-lint.py) is copied unchanged from that
+same commit. It fetches that GitHub revision through HTTPS Git and builds it with
+the required Odin compiler. No sibling linter checkout, home-directory skill,
+OLS installation or Python package is a runtime dependency. Its only cache and
+temporary source builds live in ignored `.work/odin-lint/`.
+
+For this private repository, authenticate GitHub CLI with an account that can
+read the linter repository and configure Git's credential helper:
+
+```sh
+gh auth login --hostname github.com
+gh auth setup-git --hostname github.com
+./scripts/check.sh
+```
+
+CI uses the same check script. Configure the Actions secret
+`ODIN_LINT_GITHUB_TOKEN` with read access to `IgneousRed/odin-lint`; the consuming
+repository's default `GITHUB_TOKEN` does not normally grant that access. The job
+configures Git via `gh auth setup-git` and fails if the secret is missing. Never
+store credentials in the lock file or repository.
+
+The check script runs library `-no-entry-point` checks and package tests, native
+and Wasm showcase checks (including `RAYLIB_WASM_LIB=env.o`), portable Wasm library
+checks, and the packaged-source consumer before invoking:
+
+```sh
+python3 tools/run-odin-lint.py odin-lint.lock.json \
+    --root . --source-root src --collection odin_ui=src src examples tests
+```
+
+Run `./scripts/check.sh` for verification so the compiler precondition is enforced.
+The analyzer receives the same `odin_ui` collection as `scripts/odin.sh`. The
+root includes all saved repository consumers; selected diagnostics cover library,
+showcase and test sources. The copied-source consumer is compiled separately in
+ignored `.work/` with ordinary Odin commands; generated copies are not lint input.
+Exit `0` means clean, `1` means lint findings, and `2` means setup/usage/analysis
+failure. Findings remain failures; there are no disabled or suppressed rules.
+Initial adoption successfully bootstrapped from GitHub but found existing source
+policy violations after the preceding checks passed; the unresolved backlog is
+recorded in [TODO.md](TODO.md). The full check command is not currently clean.
+
+Public library APIs may be used outside this checkout. Review visibility and
+interface-migration suggestions against those external consumers before changing
+an API; repository-local evidence alone cannot justify narrowing it. See the
+[pinned rules and analysis limits](https://github.com/IgneousRed/odin-lint/blob/289dc4e0812f108296143f60ac9e1136eec76d17/docs/rules.md).
+
+To upgrade the pin deliberately:
+
+1. Choose a published full 40-character commit and review its `README.md`,
+   `docs/integration.md`, and `docs/rules.md` through GitHub at that revision.
+2. Download the runner from that **same** revision, then update the lock's
+   `revision` to match (and `repository` only if intentionally changing upstream):
+
+   ```sh
+   LINT_REVISION=FULL_40_CHARACTER_COMMIT_SHA
+   mkdir -p .work
+   gh api -H 'Accept: application/vnd.github.raw+json' \
+       "repos/IgneousRed/odin-lint/contents/scripts/run-odin-lint.py?ref=$LINT_REVISION" \
+       > .work/run-odin-lint.py
+   cp .work/run-odin-lint.py tools/run-odin-lint.py
+   ```
+
+3. Update documented revision links and any required compiler version/CI archive
+   checksum. Delete `.work/odin-lint/` to verify a fresh GitHub bootstrap, then run
+   `./scripts/check.sh` and resolve integration failures. Record existing source
+   findings honestly; do not suppress rules to make an upgrade pass.
+4. Review and commit the runner, lock and related integration changes together.
+   Branch/tag movement upstream never changes the pinned revision.
+
 The showcase demonstrates resize, wrapping, buttons, fields, progress and shared
 input handling. It is an example host rather than a replacement application shell.
 For a runtime smoke check, click the counter, press it and release outside to

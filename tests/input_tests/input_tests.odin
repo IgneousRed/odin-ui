@@ -1,7 +1,18 @@
-package tests
+package input_tests
+
+// -------------------------------- Imports --------------------------------
+
+// ---------------- Odin ----------------
+
+import "core:testing"
+
+// ---------------- Project ----------------
 
 import input "../../src/input"
-import "core:testing"
+
+// -------------------------------- Procedures --------------------------------
+
+// ---------------- Public ----------------
 
 @(test)
 scroll_capture_starts_from_the_current_bounded_offset :: proc(t: ^testing.T) {

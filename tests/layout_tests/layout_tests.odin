@@ -1,9 +1,24 @@
-package tests
+package layout_tests
 
-import ui "../../src/layout"
+// -------------------------------- Imports --------------------------------
+
+// ---------------- Odin ----------------
+
 import "core:testing"
 
+// ---------------- Project ----------------
+
+import ui "../../src/layout"
+
+// -------------------------------- Types --------------------------------
+
+// ---------------- Public ----------------
+
 Frame :: ui.Frame(int, u32)
+
+// -------------------------------- Procedures --------------------------------
+
+// ---------------- Public ----------------
 
 @(test)
 compression_reserves_fixed_children_and_gaps_at_large_size_ratios :: proc(t: ^testing.T) {

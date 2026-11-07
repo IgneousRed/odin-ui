@@ -1,11 +1,22 @@
 // Copied to a separate project's src/ by scripts/check-vendored.sh.
-package main
+package consumer
+
+// -------------------------------- Imports --------------------------------
+
+// ---------------- Vendor ----------------
+
+import rl "vendor:raylib"
+
+// ---------------- Project ----------------
 
 import layout "../vendor/odin_ui/layout"
 import text "../vendor/odin_ui/text"
 import input "../vendor/odin_ui/input"
 import ui "../vendor/odin_ui/raylib"
-import rl "vendor:raylib"
+
+// -------------------------------- Procedures --------------------------------
+
+// ---------------- Public ----------------
 
 main :: proc() {
     frame: ui.UI

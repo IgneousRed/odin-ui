@@ -146,3 +146,82 @@ tessellation limits); the JS library and inline HTML script passed Node syntax
 checks. These results establish local build and headless behavior, not graphical
 playtesting or execution of the Ubuntu CI job. No separate linter is configured;
 its selection and the general external-review policy remain open in TODO.md.
+
+
+## 2026-11-08 two-loop sol-finish organization review
+
+Completed exactly two review/fix loops, using three fresh `gpt-6.1-sol` reviewers
+at high reasoning effort in each loop. The first loop divided implementation and
+review between portable layout/input, raylib/text, and showcase/UI; the parent
+organized tests and records. The second loop independently reviewed the complete
+result for simplification, bugs, and UI/platform behavior. The requested lint-fix
+confidence threshold changed from 99% to 90% during this task; explicit analyzer,
+visibility and inlining exclusions remained in force. No additional loop ran.
+
+Added the required kind/visibility/import sections, grouped imports, and reordered
+only confirmed same-section declaration dependencies. Moved the raylib adapter's
+public pointer/hit declarations unchanged into its interface and removed their
+empty helper. Tests now use distinct `input_tests`, `layout_tests`, `text_tests`
+and `raylib_tests` package/directory names with one interface each; this avoids
+colliding with the library packages they import. Public test declarations and all
+56 tests/assertions remain intact. Independent complete-declaration comparisons
+preserved all 147 library declarations and 61 test declarations, allowing only
+test import-alias normalization and deduplicated imports. All distributed public
+library APIs, fields, defaults, visibility attributes, declaration bodies, native
+and Wasm build conditions, JS/HTML and font assets are preserved.
+
+Loop 2 found one small tooling bug: copied-source consumer checks ignored the
+selected `ODIN` compiler. They now use `"${ODIN:-odin}"` for both ordinary compiler
+commands with the existing flags. A forwarding-compiler probe verified both the
+native `run` and Wasm `check` use the selected executable. This does not add a
+library helper or collection mapping to the independent consumer.
+
+Version metadata is 0.1.2. Upstream dependency checks found the existing required
+Odin dev-2026-11a, Allium 3.6.1, raylib 6.2 and checkout v7.0.1 already current;
+no dependencies were added or updated. The shared linter lock and copied runner
+remain byte-identical to the captured task baseline, pinned to full commit
+`289dc4e0812f108296143f60ac9e1136eec76d17` (0.3.0).
+
+The unfiltered baseline audit contained 680 findings: SECTION003 275, FLOW001 279,
+FILE004 73, IMPORT001 24, FILE002 12, FILE003 4, VIS002 11 and SIMPLIFY001 2.
+After organization the unchanged linter reports 25: SECTION003 1, FILE002 1,
+FILE004 10, VIS002 11 and SIMPLIFY001 2. No rule disables, filtering, compiler-gate
+removal or assertion weakening was used. All eleven visibility suggestions and
+both useful `padding_valid`/`position` boundaries remain deferred.
+
+The remaining organization findings are deliberately not disguised as fixes:
+
+1. `DEPTH_CAPACITY :: #config(UI_DEPTH_CAPACITY, 32)` is a public integer constant
+   correctly placed in Constants/Public. Its use as a fixed-array length causes
+   0.3.0 to misclassify its declaration kind and emit SECTION003. An isolated
+   compiler-valid `LENGTH`/`[LENGTH]int` probe reproduces the finding; replacing
+   only the array use with `[32]int` makes the control clean. Moving the constant
+   to Types or hardcoding the production array would be incorrect.
+2. `src/raylib` must declare `package raylib_ui`: renaming it to `raylib` produces
+   a compiler package-uniqueness error against `vendor:raylib`, which uses package
+   names for ABI link prefixes. The directory/import path and unaliased import
+   namespace remain `raylib`; no consumer import/API change is needed. FILE002
+   does not account for this compiler-required namespace distinction.
+3. Ten public native/web declarations remain in their original platform files.
+   Unconditional web-only imports fail native `-vet`, and Odin rejects imports
+   inside `when`, explicitly recommending file suffixes or build tags. Moving
+   everything into one interface would require new aliases/wrappers or changing
+   platform/visibility structure. These are genuine source-layout conflicts with
+   the rule's representation, not a proved analyzer implementation bug.
+
+Compiler and Allium checks, 56 Odin tests, six existing shared-toolchain Python
+tests from pre-existing uncommitted shared-toolchain work, and copied native/Wasm
+consumer checks pass. Those unrelated shared-toolchain changes remain excluded
+from this task commit; the separately exported commit tree passes its 56-test
+compiler/spec/consumer stages before reporting the same 25 lint findings.
+The full required command
+`./scripts/check.sh` still exits 1 on the 25 records above; it is not a clean or
+fully verified result. Setup/analysis failure is never treated as a pass. UI
+review was source-level and headless/compiler/link evidence; no graphical
+playtest or browser-runtime claim is made.
+
+Detailed reviewer reports, reduced cases, exact compiler errors, complete
+unfiltered before/after diagnostics, build/verification logs and declaration
+comparison evidence are retained in
+`.work/sol-finish-2loops-4qvb22np/`. Shared linter implementation bugs are reserved
+for the subsequent linter reanalysis; no sibling project was edited.

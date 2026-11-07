@@ -46,6 +46,15 @@
 - Keep the caret visible in empty focused fields.
 - Reject overflowing resolved rectangle edges and unrepresentable scissor bounds.
 
+## 0.1.2
+
+- Organize library, showcase and test declarations into explicit import, kind and
+  visibility sections; preserve declaration bodies and public library APIs.
+- Give each test package a distinct matching directory and one interface, while
+  retaining the complete headless and packaged-consumer verification suite.
+- Honor an explicit `ODIN` compiler selection in the packaged-source consumer
+  checks, retaining ordinary consumer commands and target flags.
+
 ## 0.1.1
 
 - Use `vendor/odin_ui/` consistently in installation examples and consumer checks.

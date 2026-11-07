@@ -3,7 +3,14 @@
 Before editing code, read the installed `coding` skill.
 Keep layout, text and interaction independent of raylib, operating systems and application state.
 Keep rendering and platform effects in adapters; use caller-owned state.
-See `README.md` for the API, ownership and build contracts. Run `scripts/check.sh` after changes.
+See `README.md` for the API, ownership and build contracts.
+After editing code, run `./scripts/check.sh` before completing the change. It must
+pass the applicable Odin compiler checks before running every rule of the
+GitHub-pinned shared Odin linter. Setup or analysis failure is not a pass.
+Keep the runner and root `odin-lint.lock.json` pinned to the same reviewed GitHub
+commit; follow the explicit upgrade process in `README.md`.
+Public APIs may have consumers outside this repository. Do not narrow their
+visibility or move them out of interfaces solely from repository-local lint evidence.
 This library owns no persistent application state or application sessions; example state is disposable.
 Exclude the coding skill's application-store, persistence, state-preservation, migration and recovery requirements.
 Caller-owned interaction state and frame-local working data still follow the documented ownership and lifetime contracts.

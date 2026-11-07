@@ -19,25 +19,33 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang libx11-dev libgl1-mesa-dev zip unzip
-      - name: Install Odin dev-2026-10 and Allium 3.6.1
+      - name: Install Odin dev-2026-11a and Allium 3.6.1
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p .work/tools/odin .work/tools/allium
           curl --fail --location --retry 3 \
-            https://github.com/odin-lang/Odin/releases/download/dev-2026-10/odin-linux-amd64-dev-2026-10.tar.gz \
+            https://github.com/odin-lang/Odin/releases/download/dev-2026-11a/odin-linux-amd64-dev-2026-11a.tar.gz \
             -o .work/tools/odin.tar.gz
           curl --fail --location --retry 3 \
             https://github.com/juxt/allium-tools/releases/download/v3.6.1/allium-x86_64-unknown-linux-gnu.tar.gz \
             -o .work/tools/allium.tar.gz
-          echo 'c3c8b095621fd0c75f7f73e3a0829f1b4d45324225f20ba11ed8dc4da310a8ab  .work/tools/odin.tar.gz' | sha256sum --check
+          echo '65c9f6e97d6f8a30930e151f270ce5aeaa98fe8b2ba49fe067394e2af04f7618  .work/tools/odin.tar.gz' | sha256sum --check
           echo 'e00c99ae234b10207719257a70e7c2dcad73060864468cd293fb7ad40524e970  .work/tools/allium.tar.gz' | sha256sum --check
           tar -xzf .work/tools/odin.tar.gz --strip-components=1 -C .work/tools/odin
           tar -xzf .work/tools/allium.tar.gz -C .work/tools/allium
           echo "$PWD/.work/tools/odin" >> "$GITHUB_PATH"
           echo "$PWD/.work/tools/allium" >> "$GITHUB_PATH"
-      - name: Check contracts, tests, targets, and copied-source consumer
+      - name: Check contracts, tests, targets, copied-source consumer, and shared lint
+        env:
+          GH_TOKEN: ${{ secrets.ODIN_LINT_GITHUB_TOKEN }}
+          GH_CONFIG_DIR: ${{ github.workspace }}/.work/gh
         run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo 'Set ODIN_LINT_GITHUB_TOKEN to a token with read access to IgneousRed/odin-lint.' >&2
+            exit 2
+          fi
+          gh auth setup-git --hostname github.com
           odin version
           allium --version
           ./scripts/check.sh

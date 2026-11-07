@@ -1,11 +1,25 @@
-package main
+package showcase
+
+// -------------------------------- Imports --------------------------------
+
+// ---------------- Vendor ----------------
+
+import rl "vendor:raylib"
+
+// ---------------- Odin ----------------
+
+import "core:fmt"
+import "core:strings"
+
+// ---------------- Project ----------------
 
 import ui "odin_ui:raylib"
 import input "odin_ui:input"
 import text "odin_ui:text"
-import "core:fmt"
-import "core:strings"
-import rl "vendor:raylib"
+
+// -------------------------------- Constants --------------------------------
+
+// ---------------- Public ----------------
 
 FONT_SIZE :: f32(22)
 WINDOW_WIDTH :: 800
@@ -23,6 +37,10 @@ PANEL :: rl.Color{45, 51, 64, 255}
 ACCENT :: rl.Color{75, 128, 220, 255}
 FONT_DATA :: #load("assets/AtkinsonHyperlegibleNext-SemiBold.ttf", []u8)
 
+// -------------------------------- Types --------------------------------
+
+// ---------------- Public ----------------
+
 // Keep this instance in place after building a frame, which borrows its node array.
 App :: struct {
     frame: ui.UI,
@@ -36,6 +54,10 @@ App :: struct {
     selection: text.Selection,
     editing: bool,
 }
+
+// -------------------------------- Procedures --------------------------------
+
+// ---------------- Public ----------------
 
 initialize :: proc() -> App {
     app: App

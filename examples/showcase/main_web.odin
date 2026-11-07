@@ -1,16 +1,35 @@
 #+build js
-package main
+package showcase
+
+// -------------------------------- Imports --------------------------------
+
+// ---------------- Vendor ----------------
+
+import rl "vendor:raylib"
+
+// ---------------- Odin ----------------
 
 import "base:runtime"
 import "core:mem"
-import rl "vendor:raylib"
+
+// -------------------------------- Constants --------------------------------
+
+// ---------------- Public ----------------
 
 WEB_SCRATCH_CAPACITY :: 8 * mem.Megabyte
+
+// -------------------------------- Globals --------------------------------
+
+// ---------------- Public ----------------
 
 web_app: App
 web_scratch: [WEB_SCRATCH_CAPACITY]u8
 web_arena: mem.Arena
 web_context: runtime.Context
+
+// -------------------------------- Procedures --------------------------------
+
+// ---------------- Public ----------------
 
 main :: proc() {}
 

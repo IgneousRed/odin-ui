@@ -1,24 +1,50 @@
 package layout
 
+// -------------------------------- Imports --------------------------------
+
+// ---------------- Odin ----------------
+
 import "core:math"
 import "core:mem"
 
+// -------------------------------- Constants --------------------------------
+
+// ---------------- Public ----------------
+
 NODE_CAPACITY :: #config(UI_NODE_CAPACITY, 1024)
+
 DEPTH_CAPACITY :: #config(UI_DEPTH_CAPACITY, 32)
+
 INVALID_INDEX :: -1
 #assert(NODE_CAPACITY > 0 && DEPTH_CAPACITY > 0)
 
-Vec2 :: struct {x, y: f32}
-Rect :: struct {x, y, width, height: f32}
-Direction :: enum u8 {horizontal, vertical}
-Align :: enum u8 {centre, start, end, stretch}
-Alignment :: struct {horizontal, vertical: Align}
-Fixed :: struct {value: f32}
-Grow :: struct {}
-// nil fits content; zero initialization is the ordinary layout.
-Size :: union {Fixed, Grow}
-Padding :: struct {left, top, right, bottom: f32}
-Trigger :: struct {path: string, data: rawptr}
+// -------------------------------- Types --------------------------------
+
+// ---------------- Public ----------------
+
+Frame :: struct($Content: typeid, $Color: typeid) {
+    nodes: []Node(Content, Color),
+    count: int,
+    stack: [DEPTH_CAPACITY]Builder_Entry,
+    depth: int,
+    failure: Failure,
+    failure_node: int, // INVALID_INDEX when the failure has no resolved node.
+    resolved: bool,
+    allocator: mem.Allocator,
+    viewport: Rect,
+}
+
+Node :: struct($Content: typeid, $Color: typeid) {
+    first_child, next_sibling: int,
+    style: Style(Color),
+    intrinsic: Vec2,
+    measured_width, measured_height: f32,
+    rect, clip: Rect,
+    max_scroll: f32,
+    content: Content,
+    trigger: Trigger,
+}
+
 Style :: struct($Color: typeid) {
     direction: Direction,
     width, height: Size,
@@ -32,36 +58,47 @@ Style :: struct($Color: typeid) {
     scroll_offset: f32,
     scroll_color: Color,
 }
-Unbalanced :: struct {}
-Invalid_Dimensions :: struct {}
-Node_Capacity_Exceeded :: struct {}
-Depth_Capacity_Exceeded :: struct {}
+
+Alignment :: struct {horizontal, vertical: Align}
+
+Align :: enum u8 {centre, start, end, stretch}
+
+Direction :: enum u8 {horizontal, vertical}
+
+// nil fits content; zero initialization is the ordinary layout.
+Size :: union {Fixed, Grow}
+
+Fixed :: struct {value: f32}
+
+Grow :: struct {}
+
+Padding :: struct {left, top, right, bottom: f32}
+
 Failure :: union {Invalid_Dimensions, Node_Capacity_Exceeded, Depth_Capacity_Exceeded, Unbalanced}
-Node :: struct($Content: typeid, $Color: typeid) {
-    first_child, next_sibling: int,
-    style: Style(Color),
-    intrinsic: Vec2,
-    measured_width, measured_height: f32,
-    rect, clip: Rect,
-    max_scroll: f32,
-    content: Content,
-    trigger: Trigger,
-}
+
+Invalid_Dimensions :: struct {}
+
+Node_Capacity_Exceeded :: struct {}
+
+Depth_Capacity_Exceeded :: struct {}
+
+Unbalanced :: struct {}
+
+Vec2 :: struct {x, y: f32}
+
+Rect :: struct {x, y, width, height: f32}
+
+Trigger :: struct {path: string, data: rawptr}
+
 // Construction-only links live with the bounded builder, not with every node.
 Builder_Entry :: struct {index, last_child: int}
-Frame :: struct($Content: typeid, $Color: typeid) {
-    nodes: []Node(Content, Color),
-    count: int,
-    stack: [DEPTH_CAPACITY]Builder_Entry,
-    depth: int,
-    failure: Failure,
-    failure_node: int, // INVALID_INDEX when the failure has no resolved node.
-    resolved: bool,
-    allocator: mem.Allocator,
-    viewport: Rect,
-}
+
+// -------------------------------- Procedures --------------------------------
+
+// ---------------- Public ----------------
 
 fixed :: proc(value: f32) -> Size {return Fixed{value}}
+
 grow :: proc() -> Size {return Grow{}}
 
 begin :: proc(ui: ^Frame($Content, $Color), width, height: f32, style: Style(Color), allocator: mem.Allocator = context.temp_allocator, storage: []Node(Content, Color) = nil) {
@@ -106,53 +143,6 @@ close :: proc(ui: ^Frame($Content, $Color)) {
     ui.depth -= 1
 }
 
-@(private)
-number_valid :: proc(value: f32) -> bool {
-    return value >= 0 && !math.is_inf(value)
-}
-
-@(private)
-rect_valid :: proc(rect: Rect) -> bool {
-    return !math.is_nan(rect.x) && !math.is_inf(rect.x) &&
-        !math.is_nan(rect.y) && !math.is_inf(rect.y) &&
-        number_valid(rect.width) && number_valid(rect.height) &&
-        !math.is_inf(rect.x + rect.width) && !math.is_inf(rect.y + rect.height)
-}
-
-@(private)
-sizing_valid :: proc(sizing: Size) -> bool {
-    switch size in sizing {
-    case nil, Grow:
-        return true
-    case Fixed:
-        return number_valid(size.value)
-    }
-    return false
-}
-
-@(private)
-padding_valid :: proc(padding: Padding) -> bool {
-    return(
-        number_valid(padding.left) &&
-        number_valid(padding.top) &&
-        number_valid(padding.right) &&
-        number_valid(padding.bottom) \
-    )
-}
-
-@(private)
-style_valid :: proc(style: Style($Color)) -> bool {
-    return sizing_valid(style.width) && sizing_valid(style.height) &&
-        padding_valid(style.padding) && number_valid(style.gap) &&
-        number_valid(style.radius) && number_valid(style.scroll_offset)
-}
-
-@(private)
-fail :: proc(frame: ^Frame($Content, $Color), failure: Failure, index: int = INVALID_INDEX) {
-    frame.resolved = false
-    if frame.failure == nil {frame.failure, frame.failure_node = failure, index}
-}
-
 leaf :: proc(frame: ^Frame($Content, $Color), style: Style(Color), intrinsic: Vec2 = {}) -> int {
     if frame.failure != nil do return INVALID_INDEX
     if frame.resolved {fail(frame, Unbalanced{}); return INVALID_INDEX}
@@ -186,15 +176,135 @@ leaf :: proc(frame: ^Frame($Content, $Color), style: Style(Color), intrinsic: Ve
     return index
 }
 
+intersection :: proc(a, b: Rect) -> Rect {
+    x, y := max(a.x, b.x), max(a.y, b.y)
+    return {x, y, max(0, min(a.x+a.width,b.x+b.width)-x), max(0,min(a.y+a.height,b.y+b.height)-y)}
+}
+
+// Round the two edges, rather than the width, so fractional DPI clips retain their last pixel.
+pixel_bounds :: proc(rect: Rect, scale: f32 = 1) -> Rect {
+    if !number_valid(scale) || scale == 0 || rect.width <= 0 || rect.height <= 0 {return {}}
+    left, top := math.floor(rect.x * scale), math.floor(rect.y * scale)
+    right, bottom := math.ceil((rect.x + rect.width) * scale), math.ceil((rect.y + rect.height) * scale)
+    pixels := Rect{left, top, right - left, bottom - top}
+    return pixels if rect_valid(pixels) else Rect{}
+}
+
+hit :: proc(ui: ^Frame($Content, $Color), point: Vec2) -> Trigger {
+    if !ui.resolved {return {}}
+    for index := ui.count - 1; index >= 0; index -= 1 {
+        trigger := ui.nodes[index].trigger
+        if (trigger.path != "" || trigger.data != nil) && contains(ui, index, point) {return trigger}
+    }
+    return {}
+}
+
+contains :: proc(ui: ^Frame($Content, $Color), index: int, point: Vec2) -> bool {
+    if !ui.resolved || index < 0 || index >= ui.count do return false
+    node := &ui.nodes[index]
+    return rounded_contains(point, node.clip, 0) && rounded_contains(point, node.rect, node.style.radius)
+}
+
+rounded_contains :: proc(point: Vec2, rect: Rect, radius: f32) -> bool {
+    if rect.width <= 0 || rect.height <= 0 do return false
+    if point.x < rect.x ||
+       point.x > rect.x + rect.width ||
+       point.y < rect.y ||
+       point.y > rect.y + rect.height {
+        return false
+    }
+    resolved_radius := clamp(radius, 0, min(rect.width, rect.height) / 2)
+    closest_x := clamp(point.x, rect.x + resolved_radius, rect.x + rect.width - resolved_radius)
+    closest_y := clamp(point.y, rect.y + resolved_radius, rect.y + rect.height - resolved_radius)
+    // Widen before squaring so every finite f32 scale retains its rounded corners.
+    dx := f64(point.x) - f64(closest_x)
+    dy := f64(point.y) - f64(closest_y)
+    return dx * dx + dy * dy <= f64(resolved_radius) * f64(resolved_radius)
+}
+
+measure_width :: proc(ui: ^Frame($Content, $Color),index: int) -> f32 {
+    assert(index>=0 && index<ui.count)
+    if ui.failure == nil && !ui.resolved {measure(ui,index)}
+    return ui.nodes[index].measured_width
+}
+
+finish :: proc(frame: ^Frame($Content, $Color)) -> Failure {
+    if frame.failure != nil {return frame.failure}
+    if frame.depth != 1 {fail(frame, Unbalanced{}); return frame.failure}
+    if frame.resolved {return nil}
+    measure(frame, 0)
+    frame.nodes[0].rect = frame.viewport
+    frame.nodes[0].clip = frame.viewport
+    position(frame)
+    for node, index in frame.nodes[:frame.count] {
+        if !number_valid(node.measured_width) || !number_valid(node.measured_height) ||
+           !number_valid(node.max_scroll) || !rect_valid(node.rect) || !rect_valid(node.clip) {
+            fail(frame, Invalid_Dimensions{}, index)
+            return frame.failure
+        }
+    }
+    frame.resolved = true
+    return nil
+}
+
+// Triggers share the resolved geometry; applications interpret their opaque payloads.
+action :: proc(ui: ^Frame($Content, $Color), index: int, trigger: Trigger) {
+    if index < 0 || index >= ui.count {return}
+    if ui.resolved {fail(ui, Unbalanced{}, index); return}
+    ui.nodes[index].trigger = trigger
+}
+
+node_trigger :: proc(node: ^Node($Content, $Color)) -> Trigger {
+    return node.trigger
+}
+
+// ---------------- Package ----------------
+
 @(private)
-size :: proc(sizing: Size, content: f32) -> f32 {
+style_valid :: proc(style: Style($Color)) -> bool {
+    return sizing_valid(style.width) && sizing_valid(style.height) &&
+        padding_valid(style.padding) && number_valid(style.gap) &&
+        number_valid(style.radius) && number_valid(style.scroll_offset)
+}
+
+@(private)
+sizing_valid :: proc(sizing: Size) -> bool {
     switch size in sizing {
     case nil, Grow:
-        return content
+        return true
     case Fixed:
-        return size.value
+        return number_valid(size.value)
     }
-    return 0
+    return false
+}
+
+@(private)
+padding_valid :: proc(padding: Padding) -> bool {
+    return(
+        number_valid(padding.left) &&
+        number_valid(padding.top) &&
+        number_valid(padding.right) &&
+        number_valid(padding.bottom) \
+    )
+}
+
+@(private)
+rect_valid :: proc(rect: Rect) -> bool {
+    return !math.is_nan(rect.x) && !math.is_inf(rect.x) &&
+        !math.is_nan(rect.y) && !math.is_inf(rect.y) &&
+        number_valid(rect.width) && number_valid(rect.height) &&
+        !math.is_inf(rect.x + rect.width) && !math.is_inf(rect.y + rect.height)
+}
+
+@(private)
+number_valid :: proc(value: f32) -> bool {
+    return value >= 0 && !math.is_inf(value)
+}
+
+@(private)
+fail :: proc(frame: ^Frame($Content, $Color), failure: Failure, index: int = INVALID_INDEX) {
+    frame.resolved = false
+    if frame.failure == nil {frame.failure, frame.failure_node = failure, index}
 }
 
 @(private)
@@ -224,6 +334,17 @@ measure :: proc(frame: ^Frame($Content, $Color), index: int) {
     if _, grows := main_sizing.(Grow); grows && style.scroll && node.first_child >= 0 {
         if horizontal {node.measured_width = 0} else {node.measured_height = 0}
     }
+}
+
+@(private)
+size :: proc(sizing: Size, content: f32) -> f32 {
+    switch size in sizing {
+    case nil, Grow:
+        return content
+    case Fixed:
+        return size.value
+    }
+    return 0
 }
 
 @(private)
@@ -315,86 +436,4 @@ position :: proc(frame: ^Frame($Content, $Color)) {
             cursor += main + style.gap
         }
     }
-}
-
-intersection :: proc(a, b: Rect) -> Rect {
-    x, y := max(a.x, b.x), max(a.y, b.y)
-    return {x, y, max(0, min(a.x+a.width,b.x+b.width)-x), max(0,min(a.y+a.height,b.y+b.height)-y)}
-}
-
-// Round the two edges, rather than the width, so fractional DPI clips retain their last pixel.
-pixel_bounds :: proc(rect: Rect, scale: f32 = 1) -> Rect {
-    if !number_valid(scale) || scale == 0 || rect.width <= 0 || rect.height <= 0 {return {}}
-    left, top := math.floor(rect.x * scale), math.floor(rect.y * scale)
-    right, bottom := math.ceil((rect.x + rect.width) * scale), math.ceil((rect.y + rect.height) * scale)
-    pixels := Rect{left, top, right - left, bottom - top}
-    return pixels if rect_valid(pixels) else Rect{}
-}
-
-rounded_contains :: proc(point: Vec2, rect: Rect, radius: f32) -> bool {
-    if rect.width <= 0 || rect.height <= 0 do return false
-    if point.x < rect.x ||
-       point.x > rect.x + rect.width ||
-       point.y < rect.y ||
-       point.y > rect.y + rect.height {
-        return false
-    }
-    resolved_radius := clamp(radius, 0, min(rect.width, rect.height) / 2)
-    closest_x := clamp(point.x, rect.x + resolved_radius, rect.x + rect.width - resolved_radius)
-    closest_y := clamp(point.y, rect.y + resolved_radius, rect.y + rect.height - resolved_radius)
-    // Widen before squaring so every finite f32 scale retains its rounded corners.
-    dx := f64(point.x) - f64(closest_x)
-    dy := f64(point.y) - f64(closest_y)
-    return dx * dx + dy * dy <= f64(resolved_radius) * f64(resolved_radius)
-}
-
-contains :: proc(ui: ^Frame($Content, $Color), index: int, point: Vec2) -> bool {
-    if !ui.resolved || index < 0 || index >= ui.count do return false
-    node := &ui.nodes[index]
-    return rounded_contains(point, node.clip, 0) && rounded_contains(point, node.rect, node.style.radius)
-}
-
-measure_width :: proc(ui: ^Frame($Content, $Color),index: int) -> f32 {
-    assert(index>=0 && index<ui.count)
-    if ui.failure == nil && !ui.resolved {measure(ui,index)}
-    return ui.nodes[index].measured_width
-}
-
-finish :: proc(frame: ^Frame($Content, $Color)) -> Failure {
-    if frame.failure != nil {return frame.failure}
-    if frame.depth != 1 {fail(frame, Unbalanced{}); return frame.failure}
-    if frame.resolved {return nil}
-    measure(frame, 0)
-    frame.nodes[0].rect = frame.viewport
-    frame.nodes[0].clip = frame.viewport
-    position(frame)
-    for node, index in frame.nodes[:frame.count] {
-        if !number_valid(node.measured_width) || !number_valid(node.measured_height) ||
-           !number_valid(node.max_scroll) || !rect_valid(node.rect) || !rect_valid(node.clip) {
-            fail(frame, Invalid_Dimensions{}, index)
-            return frame.failure
-        }
-    }
-    frame.resolved = true
-    return nil
-}
-
-// Triggers share the resolved geometry; applications interpret their opaque payloads.
-action :: proc(ui: ^Frame($Content, $Color), index: int, trigger: Trigger) {
-    if index < 0 || index >= ui.count {return}
-    if ui.resolved {fail(ui, Unbalanced{}, index); return}
-    ui.nodes[index].trigger = trigger
-}
-
-node_trigger :: proc(node: ^Node($Content, $Color)) -> Trigger {
-    return node.trigger
-}
-
-hit :: proc(ui: ^Frame($Content, $Color), point: Vec2) -> Trigger {
-    if !ui.resolved {return {}}
-    for index := ui.count - 1; index >= 0; index -= 1 {
-        trigger := ui.nodes[index].trigger
-        if (trigger.path != "" || trigger.data != nil) && contains(ui, index, point) {return trigger}
-    }
-    return {}
 }

@@ -1,14 +1,19 @@
-package tests
+package text_tests
 
-import text "../../src/text"
-import layout "../../src/layout"
+// -------------------------------- Imports --------------------------------
+
+// ---------------- Odin ----------------
+
 import "core:testing"
 
-monospace :: proc(value: string, size: f32, data: rawptr) -> layout.Vec2 {
-    count := 0
-    for _ in value {count += 1}
-    return {f32(count) * size, size}
-}
+// ---------------- Project ----------------
+
+import layout "../../src/layout"
+import text "../../src/text"
+
+// -------------------------------- Procedures --------------------------------
+
+// ---------------- Public ----------------
 
 @(test)
 wrapping_and_truncation_preserve_codepoints :: proc(t: ^testing.T) {
@@ -59,28 +64,10 @@ wrapping_normalizes_words_and_preserves_empty_paragraphs :: proc(t: ^testing.T) 
     }
 }
 
-// A measurement callback may depend on whole runs (for example, kerning).
-kerning :: proc(value: string, size: f32, data: rawptr) -> layout.Vec2 {
-    width := monospace(value, size, data).x
-    for index in 1 ..< len(value) {
-        if value[index - 1] == 'A' && value[index] == 'V' {width -= size / 2}
-    }
-    return {width, size}
-}
-
 @(test)
 truncation_measures_the_actual_suffix_candidate :: proc(t: ^testing.T) {
     testing.expect_value(t, text.fit("Axxxxx", 10, 15, "V", kerning), "AV")
     testing.expect_value(t, text.fit("é🙂abc", 10, 35, "…", monospace), "é🙂…")
-}
-
-// Shaping can make a longer candidate narrower, even than the suffix alone.
-contracting_measure :: proc(value: string, size: f32, data: rawptr) -> layout.Vec2 {
-    switch value {
-    case "…": return {20, size}
-    case "é🙂…": return {10, size}
-    case: return {100, size}
-    }
 }
 
 @(test)
@@ -98,5 +85,29 @@ wrapping_measures_whole_runs_when_splitting_words :: proc(t: ^testing.T) {
     testing.expect_value(t, len(lines), 4)
     for expected, index in ([4]string{"AV", "AVA", "V", "X"}) {
         testing.expect_value(t, lines[index], expected)
+    }
+}
+
+// A measurement callback may depend on whole runs (for example, kerning).
+kerning :: proc(value: string, size: f32, data: rawptr) -> layout.Vec2 {
+    width := monospace(value, size, data).x
+    for index in 1 ..< len(value) {
+        if value[index - 1] == 'A' && value[index] == 'V' {width -= size / 2}
+    }
+    return {width, size}
+}
+
+monospace :: proc(value: string, size: f32, data: rawptr) -> layout.Vec2 {
+    count := 0
+    for _ in value {count += 1}
+    return {f32(count) * size, size}
+}
+
+// Shaping can make a longer candidate narrower, even than the suffix alone.
+contracting_measure :: proc(value: string, size: f32, data: rawptr) -> layout.Vec2 {
+    switch value {
+    case "…": return {20, size}
+    case "é🙂…": return {10, size}
+    case: return {100, size}
     }
 }
