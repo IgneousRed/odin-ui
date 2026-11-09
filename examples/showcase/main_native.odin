@@ -18,11 +18,11 @@ TARGET_FPS :: 60
 // ---------------- Public ----------------
 
 main :: proc() {
-    app := initialize()
-    defer rl.CloseWindow()
-    defer rl.UnloadFont(app.font)
-    rl.SetTargetFPS(TARGET_FPS)
-    for !rl.WindowShouldClose() {
-        frame(&app, f32(rl.GetScreenWidth()), f32(rl.GetScreenHeight()))
-    }
+	app := initialize()
+	defer rl.CloseWindow()
+	defer rl.UnloadFont(app.font)
+	rl.SetTargetFPS(TARGET_FPS)
+	for !rl.WindowShouldClose() {
+		frame(&app, f32(rl.GetScreenWidth()), f32(rl.GetScreenHeight()))
+	}
 }

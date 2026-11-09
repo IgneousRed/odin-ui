@@ -20,7 +20,11 @@ var Module = (() => {
   const odinImports = odin.setupDefaultImports(memory);
   const failed = error => { status.hidden = false; status.textContent = 'Unable to start Odin UI.'; console.error(error); };
   canvas.addEventListener('pointerdown', () => canvas.focus());
-  canvas.addEventListener('keydown', event => { if (['Backspace','ArrowLeft','ArrowRight','Tab'].includes(event.key)) event.preventDefault(); });
+  // GLFW captures Tab on window; leave its default browser navigation intact.
+  window.addEventListener('keydown', event => {
+    if (event.key === 'Tab' && event.target === canvas) event.stopImmediatePropagation();
+  }, true);
+  canvas.addEventListener('keydown', event => { if (['Backspace','ArrowLeft','ArrowRight'].includes(event.key)) event.preventDefault(); });
   return {
     canvas, odinImports, print: console.log, printErr: console.error, onAbort: failed,
     instantiateWasm(imports, ready) {

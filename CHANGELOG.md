@@ -1,6 +1,21 @@
 # Changelog
 
-## Unreleased
+## 0.1.3
+
+- Keep a field's cursor position, text and selection aligned inside constrained
+  widths, including UTF-8, multiline values and blinking carets, without adding
+  interaction state.
+- Let Tab leave the web showcase canvas through normal browser focus navigation.
+
+- Upgrade the GitHub-pinned shared Odin linter to 0.7.0 with staged installation
+  and synchronized runner/lock documentation.
+- Use tab indentation throughout first-party Odin sources so maximal vetting and
+  strict-style compiler gates can run without weakening their scopes or flags.
+- Inline the sole-use padding validation and positioning procedures after
+  checking evaluation order, generic frame scope and public API preservation.
+
+- Limit eleven already-private layout/raylib helpers to their source files,
+  preserving public exports, signatures, bodies and useful semantic boundaries.
 
 - Bound stale scroll offsets before wheel input and capture, avoiding a dead zone
   when dragging or scrolling back from a reduced content extent.

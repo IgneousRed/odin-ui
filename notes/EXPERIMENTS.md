@@ -225,3 +225,55 @@ unfiltered before/after diagnostics, build/verification logs and declaration
 comparison evidence are retained in
 `.work/sol-finish-2loops-4qvb22np/`. Shared linter implementation bugs are reserved
 for the subsequent linter reanalysis; no sibling project was edited.
+
+
+## 2026-11-09 sol-finish 0.1.3
+
+Two review/fix rounds used three fresh `gpt-6.1-sol` reviewers at high reasoning
+effort per round, covering bugs, simplification and UI/platform behavior. Reviewers
+exchanged findings directly; the parent implemented the fixes. Kept the existing
+portable packages, raylib boundary, caller-owned state, public APIs, package ABI
+name and native/Wasm selection. No broader representation refactor was justified.
+
+Reproduced a clipped field caret with captured raylib drawing calls: twenty
+10-pixel glyphs in a 100-pixel field placed the end caret at x=150. Fields now
+derive a shared horizontal origin from their selection cursor position, keeping
+text, highlights and the caret aligned without new persistent state. Caret
+visibility can blink independently. Eleven focused cases cover endpoints, middle
+positions, reversed selections, UTF-8, multiline values, empty input and widths
+of 100, 2 and 1; ordinary buttons retain centered labels. Ten previous multiline
+field-overlay capture cases still pass. These are headless drawing-call checks,
+not GPU or graphical playtesting evidence.
+
+The web host lets Tab and Shift+Tab retain browser navigation. Removing only the
+canvas handler's cancellation was insufficient because the generated GLFW window
+capture handler also prevents Tab. A host capture handler registered before GLFW
+now bypasses that callback for Tab on the canvas, without cancelling the browser
+default. A Node event-dispatch harness exercises the actual generated GLFW
+handler, both Tab directions, unrelated targets and the retained editing keys.
+Inline host, JS library and generated JS syntax checks pass. Both debug showcases
+build, including the linked Wasm host. No browser runtime claim is made.
+
+The shared linter remains at published 0.7.0, full GitHub commit
+`ee48a3d2e473902d9eb16d1d074e259d058abaa1`, with the byte-exact copied runner.
+All 27 active rules run without suppression. The full working-tree check passes
+56 Odin tests, six independent Python toolchain tests, Allium, native/Wasm compiler
+gates and the packaged-source consumer, then reports zero lint findings. An
+earlier attempt segfaulted inside the unchanged Odin compiler during the portable
+Wasm text check (exit 139); it never reached lint. Its raw log is preserved. The
+subsequent full check passed the same compiler flags and configurations.
+
+Version metadata and the packaged installation guide are 0.1.3. The selected
+commit tree, exported separately without unrelated shared-toolchain edits, also
+passes the complete compiler/spec/56-test/consumer/linter command, including a
+fresh GitHub linter bootstrap. Those pending toolchain files and their mixed
+README/check-script hunks stay outside the commit.
+
+Dependency metadata still selects Odin dev-2026-11a, Allium 3.6.1, raylib 6.2,
+checkout v7.0.1 and shared lint 0.7.0. Emscripten 7.0.0 exists upstream, but the
+configured Homebrew formula and installed managed toolchain remain 6.0.13 with
+no formula update. No parallel toolchain or new dependency was installed.
+
+Exact commands, before/final logs (including failed attempts), reviewer findings,
+headless probes, selected-tree verification and source snapshots are retained
+under `.work/sol-finish-fl90z7fc/`.

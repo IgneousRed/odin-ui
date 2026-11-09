@@ -40,7 +40,7 @@ Build normally with `odin build src`. You can instead use
 `odin build src -collection:odin_ui=vendor/odin_ui`. Both forms use the same
 copied sources. The package table above uses collection notation for brevity.
 
-Version `0.1.2` is an early release; the API may change before 1.0. Read the
+Version `0.1.3` is an early release; the API may change before 1.0. Read the
 [changelog](CHANGELOG.md) before updating your copy.
 
 ## Import and ownership
@@ -117,6 +117,9 @@ used by `text.edit`. Pass the returned selection directly to the field options;
 `cursor` separately controls caret visibility. Select all with `{0, len(value)}`
 or the editing helper's `.select_all` operation. Drawing clamps offsets to UTF-8
 codepoint boundaries and places the caret at `selection.cursor`.
+Fields shift their text and selection horizontally when necessary to keep the
+selection's cursor position inside the resolved width, independently of caret
+visibility. Toggling `cursor` to blink the caret leaves that position stable.
 Fields omit their underline when the resolved width leaves no room between the
 text padding.
 Rounded controls cap corner tessellation to bound drawing work for oversized
@@ -180,7 +183,7 @@ The development check toolchain is:
 | Tool | Tested version | Source |
 | --- | --- | --- |
 | Odin | `dev-2026-11a`, compiler `9a6991685` (also printed as `9a69916`) | [November release](https://github.com/odin-lang/Odin/releases/tag/dev-2026-11a), [installation guide](https://odin-lang.org/docs/install/) |
-| Shared Odin linter runner | Python 3.9+ standard library, Git, authenticated GitHub access | [Pinned integration contract](https://github.com/IgneousRed/odin-lint/blob/289dc4e0812f108296143f60ac9e1136eec76d17/docs/integration.md) |
+| Shared Odin linter runner | Python 3.9+ standard library, Git, authenticated GitHub access | [Pinned integration contract](https://github.com/IgneousRed/odin-lint/blob/ee48a3d2e473902d9eb16d1d074e259d058abaa1/docs/integration.md) |
 | Allium CLI | `3.6.1`, including language version 3 | [Release binaries](https://github.com/juxt/allium-tools/releases/tag/v3.6.1), [installation guide](https://github.com/juxt/allium-tools#install-the-cli) |
 | Desktop raylib | `6.2` on macOS ARM64 | Linked through Odin's `vendor:raylib` collection; the tested Homebrew Odin package supplies bindings and links Homebrew raylib |
 | Emscripten (web builds) | `6.0.13` | [SDK installation guide](https://emscripten.org/docs/getting_started/downloads.html) |
@@ -213,7 +216,12 @@ installed dependencies and download no libraries.
 Checks validate shell-script syntax and the shared Allium specification, and run
 portable tests and raylib geometry/text tests without opening a window, plus native
 and Wasm showcase type checks.
-Odin commands use the compiler's `-vet` diagnostics. After editing code, run
+Compiler gates use maximal compatible first-party vetting: `-vet -vet-tabs
+-vet-using-param -vet-nil-deref -vet-uninitialized -vet-atomic-access
+-strict-style -warnings-as-errors`, with explicit first-party package scopes.
+Unused-procedure checks are separate and limited to the closed showcase and
+copied-consumer entry points; reusable library APIs and attributed test entry
+points remain under every other check. After editing code, run
 `./scripts/check.sh` before completing the change: all applicable Odin compiler
 checks must pass before the GitHub-pinned shared Odin linter runs. Every shared
 rule runs; setup or analysis failure is not a pass.
@@ -229,7 +237,7 @@ not invoke this repository’s check suite.
 
 [`odin-lint.lock.json`](odin-lint.lock.json) pins
 [`IgneousRed/odin-lint`](https://github.com/IgneousRed/odin-lint) to full commit
-`289dc4e0812f108296143f60ac9e1136eec76d17`.
+`ee48a3d2e473902d9eb16d1d074e259d058abaa1`.
 [`tools/run-odin-lint.py`](tools/run-odin-lint.py) is copied unchanged from that
 same commit. It fetches that GitHub revision through HTTPS Git and builds it with
 the required Odin compiler. No sibling linter checkout, home-directory skill,
@@ -267,37 +275,39 @@ showcase and test sources. The copied-source consumer is compiled separately in
 ignored `.work/` with ordinary Odin commands; generated copies are not lint input.
 Exit `0` means clean, `1` means lint findings, and `2` means setup/usage/analysis
 failure. Findings remain failures; there are no disabled or suppressed rules.
-Initial adoption successfully bootstrapped from GitHub but found existing source
-policy violations after the preceding checks passed; the unresolved backlog is
-recorded in [TODO.md](TODO.md). The full check command is not currently clean.
+Analyzer signal termination or an unexpected child status is reported explicitly
+and normalized to analysis failure (exit `2`).
+Record unresolved compiler, analysis and source findings in [TODO.md](TODO.md).
+A run that does not complete analysis has unknown rule counts, even when its
+output contains no diagnostics; it is never a clean result.
 
 Public library APIs may be used outside this checkout. Review visibility and
 interface-migration suggestions against those external consumers before changing
 an API; repository-local evidence alone cannot justify narrowing it. See the
-[pinned rules and analysis limits](https://github.com/IgneousRed/odin-lint/blob/289dc4e0812f108296143f60ac9e1136eec76d17/docs/rules.md).
+[pinned rules and analysis limits](https://github.com/IgneousRed/odin-lint/blob/ee48a3d2e473902d9eb16d1d074e259d058abaa1/docs/rules.md).
 
 To upgrade the pin deliberately:
 
 1. Choose a published full 40-character commit and review its `README.md`,
    `docs/integration.md`, and `docs/rules.md` through GitHub at that revision.
-2. Download the runner from that **same** revision, then update the lock's
-   `revision` to match (and `repository` only if intentionally changing upstream):
-
-   ```sh
-   LINT_REVISION=FULL_40_CHARACTER_COMMIT_SHA
-   mkdir -p .work
-   gh api -H 'Accept: application/vnd.github.raw+json' \
-       "repos/IgneousRed/odin-lint/contents/scripts/run-odin-lint.py?ref=$LINT_REVISION" \
-       > .work/run-odin-lint.py
-   cp .work/run-odin-lint.py tools/run-odin-lint.py
-   ```
-
-3. Update documented revision links and any required compiler version/CI archive
-   checksum. Delete `.work/odin-lint/` to verify a fresh GitHub bootstrap, then run
-   `./scripts/check.sh` and resolve integration failures. Record existing source
-   findings honestly; do not suppress rules to make an upgrade pass.
+2. Stage all four required upstream files from that **same** revision in a new
+   ignored `.work/` directory using authenticated `gh api` and
+   `Accept: application/vnd.github.raw+json`: `README.md`, `docs/integration.md`,
+   `docs/rules.md`, and `scripts/run-odin-lint.py`. Read the staged docs, validate
+   the runner's Python syntax, and prepare a staged root lock containing the
+   repository and exact revision. Failed downloads must leave the installed pair
+   untouched; the pinned integration guide contains the complete staging commands.
+3. Install the reviewed runner and matching lock together, without running lint
+   between replacements. Update documented revision links and any required
+   compiler version/CI archive checksum. Verify an empty cache entry for the new
+   revision with a real GitHub bootstrap and `--version`, then run
+   `./scripts/check.sh`. Compiler failures stop lint; retain concrete source and
+   analysis failures instead of suppressing rules or treating skipped lint as clean.
 4. Review and commit the runner, lock and related integration changes together.
-   Branch/tag movement upstream never changes the pinned revision.
+   Branch/tag movement upstream never changes the pinned revision. Preserve the
+   runner's repository/compiler/host cache identity; `.work/odin-lint/` is the only
+   runtime cache. The pinned policy keeps `SIMPLIFY001` imperative; apply an inlining
+   change only after checking its actual call binding and semantic safety.
 
 The showcase demonstrates resize, wrapping, buttons, fields, progress and shared
 input handling. It is an example host rather than a replacement application shell.

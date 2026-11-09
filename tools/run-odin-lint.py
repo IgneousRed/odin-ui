@@ -55,7 +55,14 @@ def main():
                             f"-define:ODIN_LINT_REVISION={revision}", f"-out:{built}"],
                            cwd=source, check=True, stdout=sys.stderr)
             os.replace(built, binary)
-    return subprocess.run([str(binary), *sys.argv[2:]]).returncode
+    status = subprocess.run([str(binary), *sys.argv[2:]]).returncode
+    if status < 0:
+        print(f"odin-lint analysis failed: analyzer terminated by signal {-status}", file=sys.stderr)
+        return 2
+    if status not in (0, 1, 2):
+        print(f"odin-lint analysis failed: analyzer exited with unexpected status {status}", file=sys.stderr)
+        return 2
+    return status
 
 
 if __name__ == "__main__":

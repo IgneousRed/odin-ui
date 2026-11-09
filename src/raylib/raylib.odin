@@ -73,12 +73,12 @@ Node :: layout.Node(Layout_Content, rl.Color)
 Layout_Content :: union {Layout_Text, Layout_Button, Layout_Bar}
 
 Layout_Text :: struct {
-    value: string,
-    font: rl.Font,
-    pixel_size: f32,
-    color: rl.Color,
-    centered, wrap: bool,
-    wrapped_lines: []string,
+	value: string,
+	font: rl.Font,
+	pixel_size: f32,
+	color: rl.Color,
+	centered, wrap: bool,
+	wrapped_lines: []string,
 }
 
 Layout_Button :: struct {
@@ -99,10 +99,10 @@ Text_Options :: struct {width, height: Size}
 Button_Options :: struct {width, height: Size, pressed: bool}
 
 Field_Options :: struct {
-    width, height: Size,
-    pressed, cursor: bool,
-    selection: text_core.Selection,
-    selection_background: rl.Color,
+	width, height: Size,
+	pressed, cursor: bool,
+	selection: text_core.Selection,
+	selection_background: rl.Color,
 }
 
 Style :: layout.Style(rl.Color)
@@ -130,30 +130,30 @@ draw :: proc(ui: ^UI, scale: f32 = 1) {
 		if !begin_clip(ui, index, scale) {continue}
 		// Successful clipping guarantees positive node dimensions.
 		if style := node.style; style.background.a > 0 {
-            if style.radius > 0 {
-                rl.DrawRectangleRounded(raylib_rect(node.rect), min(1, 2 * style.radius / min(node.rect.width, node.rect.height)), BACKGROUND_CORNER_SEGMENTS, style.background)
-            } else {rl.DrawRectangleRec(raylib_rect(node.rect), style.background)}
-        }
+			if style.radius > 0 {
+				rl.DrawRectangleRounded(raylib_rect(node.rect), min(1, 2 * style.radius / min(node.rect.width, node.rect.height)), BACKGROUND_CORNER_SEGMENTS, style.background)
+			} else {rl.DrawRectangleRec(raylib_rect(node.rect), style.background)}
+		}
 		switch content in node.content {
 		case nil:
 		case Layout_Bar:
-            rl.DrawRectangleRec({node.rect.x, node.rect.y, node.rect.width * content.value, node.rect.height}, content.color)
-        case Layout_Text:
-            single_line := [1]string{content.value}
-            lines := content.wrapped_lines
-            if !content.wrap {lines = single_line[:]}
-            y := node.rect.y
-            for line in lines {
-                origin := rl.Vector2{node.rect.x, y}
-                runes := utf8.string_to_runes(line, context.temp_allocator)
-                if content.centered || !content.wrap {
-                    size := rl.MeasureTextCodepoints(content.font, (^c.int)(raw_data(runes)), c.int(len(runes)), content.pixel_size, 0)
-                    origin.x += (node.rect.width - size.x) / 2
-                    if !content.wrap {origin.y += (node.rect.height - size.y) / 2}
-                }
-                rl.DrawTextCodepoints(content.font, raw_data(runes), c.int(len(runes)), origin, content.pixel_size, 0, content.color)
-                y += content.pixel_size + TEXT_LINE_GAP
-            }
+			rl.DrawRectangleRec({node.rect.x, node.rect.y, node.rect.width * content.value, node.rect.height}, content.color)
+		case Layout_Text:
+			single_line := [1]string{content.value}
+			lines := content.wrapped_lines
+			if !content.wrap {lines = single_line[:]}
+			y := node.rect.y
+			for line in lines {
+				origin := rl.Vector2{node.rect.x, y}
+				runes := utf8.string_to_runes(line, context.temp_allocator)
+				if content.centered || !content.wrap {
+					size := rl.MeasureTextCodepoints(content.font, (^c.int)(raw_data(runes)), c.int(len(runes)), content.pixel_size, 0)
+					origin.x += (node.rect.width - size.x) / 2
+					if !content.wrap {origin.y += (node.rect.height - size.y) / 2}
+				}
+				rl.DrawTextCodepoints(content.font, raw_data(runes), c.int(len(runes)), origin, content.pixel_size, 0, content.color)
+				y += content.pixel_size + TEXT_LINE_GAP
+			}
 		case Layout_Button:
 			background := content.pressed_background if content.pressed else content.background
 			foreground := button_foreground(background)
@@ -183,9 +183,21 @@ draw :: proc(ui: ^UI, scale: f32 = 1) {
 			size := rl.MeasureTextCodepoints(content.font, (^c.int)(raw_data(runes)), c.int(len(runes)), content.pixel_size, 0)
 			origin := rl.Vector2{node.rect.x + (node.rect.width - size.x) / 2, node.rect.y + (node.rect.height - size.y) / 2}
 			caret := rl.Rectangle{origin.x, node.rect.y + (node.rect.height - max(content.pixel_size, size.y)) / 2, BORDER_WIDTH, content.pixel_size}
-			if selection.anchor != selection.cursor || content.cursor {
+			if selection.anchor != selection.cursor || content.cursor || content.underline {
 				// Measuring a newline follows raylib's current global line spacing.
 				line_step := measure_text(content.font, "\n", content.pixel_size).y - content.pixel_size
+				if content.underline || content.cursor {
+					line_start := 0
+					for offset in 0 ..< selection.cursor {
+						if content.value[offset] == '\n' {line_start = offset + 1}
+					}
+					cursor_x := origin.x + measure_text(content.font, content.value[line_start:selection.cursor], content.pixel_size).x
+					padding := min(control_padding(content.pixel_size), max(0, (node.rect.width - BORDER_WIDTH) / 2))
+					left := node.rect.x + padding
+					right := max(left, node.rect.x + node.rect.width - padding - BORDER_WIDTH)
+					// Keep the field's cursor position visible even while its caret blinks.
+					origin.x += clamp(cursor_x, left, right) - cursor_x
+				}
 				start, end := min(selection.anchor, selection.cursor), max(selection.anchor, selection.cursor)
 				line_start := 0
 				y := caret.y
@@ -219,19 +231,19 @@ draw :: proc(ui: ^UI, scale: f32 = 1) {
 		}
 		rl.EndScissorMode()
 	}
-    for &node, index in ui.nodes[:ui.count] {
-        style := node.style
-        if !style.scroll || node.max_scroll <= 0 || style.scroll_color.a == 0 || !begin_clip(ui, index, scale) {continue}
-        horizontal := style.direction == .horizontal
-        extent := node.rect.width if horizontal else node.rect.height
-        track := max(0, extent - 2 * SCROLLBAR_INSET)
-        thumb := min(track, max(SCROLLBAR_MIN_THUMB, track * track / (track + node.max_scroll)))
-        offset := SCROLLBAR_INSET + (track - thumb) * clamp(style.scroll_offset / node.max_scroll, 0, 1)
-        bounds := rl.Rectangle{node.rect.x + node.rect.width - SCROLLBAR_INSET, node.rect.y + offset, SCROLLBAR_WIDTH, thumb}
-        if horizontal {bounds = {node.rect.x + offset, node.rect.y + node.rect.height - SCROLLBAR_INSET, thumb, SCROLLBAR_WIDTH}}
-        rl.DrawRectangleRec(bounds, style.scroll_color)
-        rl.EndScissorMode()
-    }
+	for &node, index in ui.nodes[:ui.count] {
+		style := node.style
+		if !style.scroll || node.max_scroll <= 0 || style.scroll_color.a == 0 || !begin_clip(ui, index, scale) {continue}
+		horizontal := style.direction == .horizontal
+		extent := node.rect.width if horizontal else node.rect.height
+		track := max(0, extent - 2 * SCROLLBAR_INSET)
+		thumb := min(track, max(SCROLLBAR_MIN_THUMB, track * track / (track + node.max_scroll)))
+		offset := SCROLLBAR_INSET + (track - thumb) * clamp(style.scroll_offset / node.max_scroll, 0, 1)
+		bounds := rl.Rectangle{node.rect.x + node.rect.width - SCROLLBAR_INSET, node.rect.y + offset, SCROLLBAR_WIDTH, thumb}
+		if horizontal {bounds = {node.rect.x + offset, node.rect.y + node.rect.height - SCROLLBAR_INSET, thumb, SCROLLBAR_WIDTH}}
+		rl.DrawRectangleRec(bounds, style.scroll_color)
+		rl.EndScissorMode()
+	}
 }
 
 field :: proc(
@@ -321,48 +333,48 @@ hsl_blend :: proc(from, to: rl.Color, amount: f32) -> rl.Color {
 }
 
 finish :: proc(ui: ^UI) -> Layout_Failure {
-    if ui.resolved {return ui.failure}
-    failure := layout.finish(ui)
-    if failure != nil {return failure}
-    wrapped := false
-    for &node in ui.nodes[:ui.count] {
-        if content, ok := node.content.(Layout_Text); ok && content.wrap {
-            wrapped = true
-            // Retain the derived lines for drawing; declared fit/fixed sizing stays intact.
-            content.wrapped_lines = text_lines(content, node.rect.width, ui.allocator)
-            node.content = content
-            line_count := len(content.wrapped_lines)
-            node.intrinsic.y = f32(line_count) * content.pixel_size + f32(line_count - 1) * TEXT_LINE_GAP
-        }
-    }
-    if !wrapped {return nil}
-    ui.resolved = false
-    return layout.finish(ui)
+	if ui.resolved {return ui.failure}
+	failure := layout.finish(ui)
+	if failure != nil {return failure}
+	wrapped := false
+	for &node in ui.nodes[:ui.count] {
+		if content, ok := node.content.(Layout_Text); ok && content.wrap {
+			wrapped = true
+			// Retain the derived lines for drawing; declared fit/fixed sizing stays intact.
+			content.wrapped_lines = text_lines(content, node.rect.width, ui.allocator)
+			node.content = content
+			line_count := len(content.wrapped_lines)
+			node.intrinsic.y = f32(line_count) * content.pixel_size + f32(line_count - 1) * TEXT_LINE_GAP
+		}
+	}
+	if !wrapped {return nil}
+	ui.resolved = false
+	return layout.finish(ui)
 }
 
 text :: proc(ui: ^UI, font: rl.Font, value: string, pixel_size: f32, color: rl.Color, options: Text_Options = {}) -> int {
-    size := measure_text(font, value, pixel_size)
-    size.y = max(pixel_size, size.y)
-    width, height := options.width, options.height
-    if width == nil {width = fixed(size.x)}
-    if height == nil {height = fixed(size.y)}
-    index := layout_leaf(ui, {width = width, height = height}, {size.x, size.y})
-    if index >= 0 {ui.nodes[index].content = Layout_Text{value = strings.clone(value, ui.allocator), font = font, pixel_size = pixel_size, color = color, centered = true}}
-    return index
+	size := measure_text(font, value, pixel_size)
+	size.y = max(pixel_size, size.y)
+	width, height := options.width, options.height
+	if width == nil {width = fixed(size.x)}
+	if height == nil {height = fixed(size.y)}
+	index := layout_leaf(ui, {width = width, height = height}, {size.x, size.y})
+	if index >= 0 {ui.nodes[index].content = Layout_Text{value = strings.clone(value, ui.allocator), font = font, pixel_size = pixel_size, color = color, centered = true}}
+	return index
 }
 
 // Paragraphs wrap after horizontal layout has established the available width.
 paragraph :: proc(ui: ^UI, font: rl.Font, value: string, pixel_size: f32, color: rl.Color, centered: bool = false, width: Size = layout.Grow{}) -> int {
-    intrinsic := layout.Vec2{y = pixel_size}
-    if width == nil {intrinsic.x = measure_text(font, value, pixel_size).x}
-    index := layout_leaf(ui, {width = width}, intrinsic)
-    if index >= 0 {ui.nodes[index].content = Layout_Text{value = strings.clone(value, ui.allocator), font = font, pixel_size = pixel_size, color = color, centered = centered, wrap = true}}
-    return index
+	intrinsic := layout.Vec2{y = pixel_size}
+	if width == nil {intrinsic.x = measure_text(font, value, pixel_size).x}
+	index := layout_leaf(ui, {width = width}, intrinsic)
+	if index >= 0 {ui.nodes[index].content = Layout_Text{value = strings.clone(value, ui.allocator), font = font, pixel_size = pixel_size, color = color, centered = centered, wrap = true}}
+	return index
 }
 
 fit_text :: proc(font: rl.Font, value: string, pixel_size, width: f32, suffix: string = "...") -> string {
-    measured_font := font
-    return text_core.fit(value, pixel_size, width, suffix, measure_for_wrap, &measured_font)
+	measured_font := font
+	return text_core.fit(value, pixel_size, width, suffix, measure_for_wrap, &measured_font)
 }
 
 control_width :: proc(text_width, pixel_size: f32) -> f32 {
@@ -380,48 +392,48 @@ separator :: proc(ui: ^UI, color: rl.Color, width := f32(1)) -> int {
 	return layout_leaf(ui, Style{
 		width = grow() if direction == .vertical else fixed(width),
 		height = fixed(width) if direction == .vertical else grow(),
-        background = color,
+		background = color,
 	})
 }
 
 bar :: proc(ui: ^UI, value, height: f32, color, background: rl.Color) {
-    index := layout_leaf(ui, {width = grow(), height = fixed(height), background = background})
-    if index >= 0 {ui.nodes[index].content = Layout_Bar{clamp(value, 0, 1), color}}
+	index := layout_leaf(ui, {width = grow(), height = fixed(height), background = background})
+	if index >= 0 {ui.nodes[index].content = Layout_Bar{clamp(value, 0, 1), color}}
 }
 
 begin :: proc(ui: ^UI, width, height: f32, style: Style = {}, allocator: mem.Allocator = context.temp_allocator, storage: []Node = nil) {
-    layout.begin(ui, width, height, style, allocator, storage)
+	layout.begin(ui, width, height, style, allocator, storage)
 }
 
 contains :: proc(ui: ^UI, index: int, point: rl.Vector2) -> bool {
-    return layout.contains(ui, index, {point.x, point.y})
+	return layout.contains(ui, index, {point.x, point.y})
 }
 
 rounded_rect_contains :: proc(point: rl.Vector2, rect: Layout_Rect, radius: f32) -> bool {
-    return layout.rounded_contains({point.x, point.y}, rect, radius)
+	return layout.rounded_contains({point.x, point.y}, rect, radius)
 }
 
 // Input collection is optional: custom hosts can supply the same portable Pointer directly.
 pointer :: proc(previous: input.Pointer, scale: f32 = 1) -> input.Pointer {
-    position := rl.GetMousePosition()
-    mouse := input.Pointer{position = {position.x, position.y},
-        pressed = rl.IsMouseButtonPressed(.LEFT), down = rl.IsMouseButtonDown(.LEFT),
-        released = rl.IsMouseButtonReleased(.LEFT)}
-    touches := make([]input.Touch, rl.GetTouchPointCount(), context.temp_allocator)
-    for &touch, index in touches {
-        point := rl.GetTouchPosition(i32(index))
-        touch = {int(rl.GetTouchPointId(i32(index))), {point.x, point.y}}
-    }
-    return input.pointer(previous, mouse, touches, rl.IsWindowFocused(), scale)
+	position := rl.GetMousePosition()
+	mouse := input.Pointer{position = {position.x, position.y},
+		pressed = rl.IsMouseButtonPressed(.LEFT), down = rl.IsMouseButtonDown(.LEFT),
+		released = rl.IsMouseButtonReleased(.LEFT)}
+	touches := make([]input.Touch, rl.GetTouchPointCount(), context.temp_allocator)
+	for &touch, index in touches {
+		point := rl.GetTouchPosition(i32(index))
+		touch = {int(rl.GetTouchPointId(i32(index))), {point.x, point.y}}
+	}
+	return input.pointer(previous, mouse, touches, rl.IsWindowFocused(), scale)
 }
 
 hit :: proc(ui: ^UI, point: rl.Vector2) -> Trigger {
-    return layout.hit(ui, {point.x, point.y})
+	return layout.hit(ui, {point.x, point.y})
 }
 
 text_lines :: proc(content: Layout_Text, width: f32, allocator: mem.Allocator = context.temp_allocator) -> []string {
-    font := content.font
-    return text_core.lines(content.value, width, content.pixel_size, measure_for_wrap, &font, allocator)
+	font := content.font
+	return text_core.lines(content.value, width, content.pixel_size, measure_for_wrap, &font, allocator)
 }
 
 space :: proc(ui: ^UI) -> int {return layout_leaf(ui, {width = grow(), height = grow()})}
@@ -465,19 +477,19 @@ color_hsl :: proc(color: rl.Color) -> HSL {
 }
 
 begin_clip :: proc(ui: ^UI, index: int, scale: f32 = 1) -> bool {
-    if !ui.resolved || index < 0 || index >= ui.count {return false}
-    node := &ui.nodes[index]
-    clip := intersection(node.clip, node.rect)
-    pixels := layout.pixel_bounds(clip, scale)
-    if pixels.width <= 0 || pixels.height <= 0 {return false}
-    scissor_min := f32(min(i32))
-    // The positive i32 limit is exclusive and exactly representable as f32.
-    scissor_limit := -scissor_min
-    for value in ([6]f32{pixels.x, pixels.y, pixels.width, pixels.height, pixels.x + pixels.width, pixels.y + pixels.height}) {
-        if value < scissor_min || value >= scissor_limit {return false}
-    }
-    rl.BeginScissorMode(i32(pixels.x), i32(pixels.y), i32(pixels.width), i32(pixels.height))
-    return true
+	if !ui.resolved || index < 0 || index >= ui.count {return false}
+	node := &ui.nodes[index]
+	clip := intersection(node.clip, node.rect)
+	pixels := layout.pixel_bounds(clip, scale)
+	if pixels.width <= 0 || pixels.height <= 0 {return false}
+	scissor_min := f32(min(i32))
+	// The positive i32 limit is exclusive and exactly representable as f32.
+	scissor_limit := -scissor_min
+	for value in ([6]f32{pixels.x, pixels.y, pixels.width, pixels.height, pixels.x + pixels.width, pixels.y + pixels.height}) {
+		if value < scissor_min || value >= scissor_limit {return false}
+	}
+	rl.BeginScissorMode(i32(pixels.x), i32(pixels.y), i32(pixels.width), i32(pixels.height))
+	return true
 }
 
 control_padding :: proc(pixel_size: f32) -> f32 {
@@ -550,15 +562,15 @@ action :: layout.action
 
 node_trigger :: layout.node_trigger
 
-// ---------------- Package ----------------
+// ---------------- File ----------------
 
-@(private)
+@(private="file")
 measure_for_wrap :: proc(value: string, pixel_size: f32, data: rawptr) -> layout.Vec2 {
-    size := measure_text((^rl.Font)(data)^, value, pixel_size)
-    return {size.x, size.y}
+	size := measure_text((^rl.Font)(data)^, value, pixel_size)
+	return {size.x, size.y}
 }
 
-@(private)
+@(private="file")
 raylib_rect :: proc(rect: Layout_Rect) -> rl.Rectangle {
 	return {rect.x, rect.y, rect.width, rect.height}
 }

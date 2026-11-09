@@ -1,7 +1,7 @@
 # Copy Odin UI into your project
 
-Download `odin_ui-v0.1.2.zip` from the
-[v0.1.2 release](https://github.com/IgneousRed/odin-ui/releases/tag/v0.1.2).
+Download `odin_ui-v0.1.3.zip` from the
+[v0.1.3 release](https://github.com/IgneousRed/odin-ui/releases/tag/v0.1.3).
 Extract its `odin_ui/` folder into your project's `vendor/` directory:
 
 ```text
