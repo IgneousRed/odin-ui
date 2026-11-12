@@ -50,3 +50,12 @@ ui_frame :: proc "c" (width, height: i32) {
 	if rl.GetScreenWidth() != width || rl.GetScreenHeight() != height {rl.SetWindowSize(width, height)}
 	frame(&web_app, f32(width), f32(height))
 }
+
+// Only the disposable smoke build exports inspection; shipped examples omit it.
+when #config(UI_WEB_SMOKE, false) {
+	@(export)
+	ui_smoke_snapshot :: proc "c" () -> cstring {
+		context = web_context
+		return smoke_snapshot(&web_app)
+	}
+}

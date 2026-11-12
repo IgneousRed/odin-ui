@@ -14,3 +14,9 @@ visibility or move them out of interfaces solely from repository-local lint evid
 This library owns no persistent application state or application sessions; example state is disposable.
 Exclude the coding skill's application-store, persistence, state-preservation, migration and recovery requirements.
 Caller-owned interaction state and frame-local working data still follow the documented ownership and lifetime contracts.
+
+Use maximal compatible Odin compiler vetting on first-party packages, with
+strict style and warnings as errors, through the documented verification command.
+Keep unused-procedure checks scoped to closed application entry points; preserve
+test entry points and external library consumers. Compiler failure must stop
+shared lint. Keep every actual target, define, collection and non-Odin check.

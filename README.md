@@ -41,8 +41,9 @@ Build normally with `odin build src`. You can instead use
 `odin build src -collection:odin_ui=vendor/odin_ui`. Both forms use the same
 copied sources. The package table above uses collection notation for brevity.
 
-Version `0.2.0` is an early release; the API may change before 1.0. Read the
-[changelog](CHANGELOG.md) before updating your copy.
+Development version `0.2.1` is not yet published; released archives are listed
+on the [releases page](https://github.com/IgneousRed/odin-ui/releases). The API
+may change before 1.0. Read the [changelog](CHANGELOG.md) before updating your copy.
 
 ## Import and ownership
 
@@ -90,7 +91,9 @@ clipping and the hit radius. `row_layout` and `column_layout` open containers;
 valid. A successful `finish_layout` returns the resolved view and nil failure;
 repeating it reuses prepared text without measuring again. Failed layouts supply
 no hits or paint operations. Node/depth limits and failure values retain the
-portable layout contracts described below.
+portable layout contracts described below. For a production alternative to the
+showcase assertion, see [host-owned frame failure handling](docs/frame-failures.md)
+and its [runnable example](examples/failure_policy/failure_policy.odin).
 
 Text content, font and pixel size enter layout. Strings are copied into the
 supplied allocator; prepared runes, wrapped lines, line offsets and field cursor
@@ -197,17 +200,19 @@ The development check toolchain is:
 | Tool | Tested version | Source |
 | --- | --- | --- |
 | Odin | `dev-2026-11a`, compiler `9a6991685` (also printed as `9a69916`) | [November release](https://github.com/odin-lang/Odin/releases/tag/dev-2026-11a), [installation guide](https://odin-lang.org/docs/install/) |
-| Shared Odin linter runner | Python 3.9+ standard library, Git, authenticated GitHub access | [Pinned integration contract](https://github.com/IgneousRed/odin-lint/blob/ee48a3d2e473902d9eb16d1d074e259d058abaa1/docs/integration.md) |
+| Shared Odin linter runner | Python 3.9+ standard library, Git, authenticated GitHub access | [Pinned integration contract](https://github.com/IgneousRed/odin-lint/blob/949293b8a7fcff8f72927b5afb5c5ada8b2df896/docs/integration.md) |
 | Allium CLI | `3.6.1`, including language version 3 | [Release binaries](https://github.com/juxt/allium-tools/releases/tag/v3.6.1), [installation guide](https://github.com/juxt/allium-tools#install-the-cli) |
 | Desktop raylib | `6.2` on macOS ARM64 | Linked through Odin's `vendor:raylib` collection; the tested Homebrew Odin package supplies bindings and links Homebrew raylib |
-| Emscripten (web builds) | `6.0.13` | [SDK installation guide](https://emscripten.org/docs/getting_started/downloads.html) |
-| Web raylib | `6.2`, static, OpenGL ES 2 | [Tagged source](https://github.com/raysan5/raylib/tree/6.2) |
+| Node.js | 18+ standard library; no npm packages | Host regression checks and optional Chromium smoke runner |
+| Emscripten (web builds) | Installed Homebrew version | [Homebrew package](https://formulae.brew.sh/formula/emscripten) |
+| Web raylib | Installed Homebrew version, static, OpenGL ES 2 | Source and SHA-256 from the installed Homebrew formula |
 
 GitHub Actions runs the complete check suite on Ubuntu 24.04 using the official
 Odin `dev-2026-11a` archive (including its bundled raylib) and Allium `3.6.1`.
 Downloaded tool archives are verified by SHA-256. The desktop and linked web
 showcase were previously exercised with Odin `dev-2026-10:84bc3fc21` on macOS;
-the current check suite does not link or playtest the web showcase.
+the default check suite does not link or playtest the web showcase.
+`./scripts/check-web.sh` provides a separate linked Chromium runtime check.
 
 Install Odin and Allium using the linked upstream instructions, put their
 executables on `PATH`, and confirm `odin version` and `allium --version` before
@@ -217,9 +222,12 @@ needs the platform's native compiler/linker (Xcode Command Line Tools on macOS).
 Keep the compiler's `base`, `core` and `vendor` collections with it. Native raylib
 linking follows that Odin distribution's vendor setup.
 
-The portable library needs no Emscripten installation. The full check script also
-type-checks the Wasm target, but does not link a web executable. Build scripts use
-installed dependencies and download no libraries.
+The portable library needs no Emscripten installation. The default check script
+also type-checks the Wasm target, but does not link a web executable. The optional
+web check below links and runs the actual host. The Homebrew web resolver may
+download checksum-verified raylib source when its shared cache is cold; explicit
+SDK/archive builds use only the dependencies you provide. No script installs a
+compiler or browser.
 
 ```sh
 ./scripts/check.sh
@@ -229,7 +237,15 @@ installed dependencies and download no libraries.
 
 Checks validate shell-script syntax and the shared Allium specification, and run
 portable tests and raylib geometry/text tests without opening a window, plus native
-and Wasm showcase type checks.
+and Wasm showcase type checks. Maintained drawing-capture cases exercise caret
+visibility, UTF-8 and multiline selections, narrow fields and ordinary button
+centering against real raylib measurements. The capture package runs serially
+because raylib line spacing is process-global; macOS interposes shared-library
+drawing calls and Linux wraps the bundled static archive's drawing symbols.
+Node checks execute the actual HTML host's keyboard routing, frame-failure
+handling and Odin import forwarding. Node 18+ is required; set `NODE` to select
+an executable explicitly. The standard suite also checks the smoke-build define
+with the same compiler vetting as the normal showcase.
 Compiler gates use maximal compatible first-party vetting: `-vet -vet-tabs
 -vet-using-param -vet-nil-deref -vet-uninitialized -vet-atomic-access
 -strict-style -warnings-as-errors`, with explicit first-party package scopes.
@@ -251,7 +267,7 @@ not invoke this repository’s check suite.
 
 [`odin-lint.lock.json`](odin-lint.lock.json) pins
 [`IgneousRed/odin-lint`](https://github.com/IgneousRed/odin-lint) to full commit
-`ee48a3d2e473902d9eb16d1d074e259d058abaa1`.
+`949293b8a7fcff8f72927b5afb5c5ada8b2df896`.
 [`tools/run-odin-lint.py`](tools/run-odin-lint.py) is copied unchanged from that
 same commit. It fetches that GitHub revision through HTTPS Git and builds it with
 the required Odin compiler. No sibling linter checkout, home-directory skill,
@@ -275,7 +291,8 @@ store credentials in the lock file or repository.
 
 The check script runs library `-no-entry-point` checks and package tests, native
 and Wasm showcase checks (including `RAYLIB_WASM_LIB=env.o`), portable Wasm library
-checks, and the packaged-source consumer before invoking:
+checks, the native/Wasm failure-policy example, and the packaged-source consumer
+before invoking:
 
 ```sh
 python3 tools/run-odin-lint.py odin-lint.lock.json \
@@ -298,7 +315,7 @@ output contains no diagnostics; it is never a clean result.
 Public library APIs may be used outside this checkout. Review visibility and
 interface-migration suggestions against those external consumers before changing
 an API; repository-local evidence alone cannot justify narrowing it. See the
-[pinned rules and analysis limits](https://github.com/IgneousRed/odin-lint/blob/ee48a3d2e473902d9eb16d1d074e259d058abaa1/docs/rules.md).
+[pinned rules and analysis limits](https://github.com/IgneousRed/odin-lint/blob/949293b8a7fcff8f72927b5afb5c5ada8b2df896/docs/rules.md).
 
 To upgrade the pin deliberately:
 
@@ -331,37 +348,67 @@ to a narrow and a wide viewport. In the browser, move focus away from the canvas
 during a press and confirm that releasing does not increment the counter. These
 checks exercise the linked host; a successful type check alone does not cover them.
 
-To build its web files, provide an activated Emscripten SDK and a raylib static
-library built with that SDK. Reuse existing compatible installations or prepare
-the tested versions manually from the repository root (requires Git, Python 3
-and Make):
+Web builds use the installed Homebrew Emscripten and raylib versions and one
+shared WebAssembly archive under `~/.local/share/dev-pool/raylib-web/`:
 
 ```sh
-git clone --depth 1 --branch 6.0.13 https://github.com/emscripten-core/emsdk.git .work/emsdk
-.work/emsdk/emsdk install 6.0.13
-.work/emsdk/emsdk activate 6.0.13
+brew install emscripten raylib
+./scripts/build-example.sh web
 ```
 
-Then, in Bash or Zsh, activate the SDK and build raylib and the showcase:
+The archive is rebuilt automatically when either Homebrew toolchain changes,
+then reused by other projects and worktrees. Builds verify the source SHA-256
+from the installed Homebrew formula, check Odin's raylib binding version,
+serialize concurrent builds and publish only after linking and running a smoke
+test. Failed rebuilds leave older versions intact. Set `DEV_POOL_ROOT` to choose
+another shared pool. Native raylib still comes through Odin/Homebrew; browser
+builds use the shared WebAssembly archive via `RAYLIB_WASM_LIB=env.o` binding mode.
+To use an existing SDK/archive on Linux or another supported Emscripten host,
+activate the SDK and supply an absolute archive path built with that SDK:
 
 ```sh
-source .work/emsdk/emsdk_env.sh
-emcc --version
-git clone --depth 1 --branch 6.2 https://github.com/raysan5/raylib.git .work/raylib
-make -C .work/raylib/src -j4 PLATFORM=PLATFORM_WEB RAYLIB_LIBTYPE=STATIC GRAPHICS=GRAPHICS_API_OPENGL_ES2
-EMSDK="$PWD/.work/emsdk" RAYLIB_WEB_LIB="$PWD/.work/raylib/src/libraylib.web.a" \
+RAYLIB_WEB_LIB=/absolute/path/libraylib.web.a ./scripts/build-example.sh web
+# Or activate an SDK explicitly for this command:
+EMSDK=/absolute/path/emsdk RAYLIB_WEB_LIB=/absolute/path/libraylib.web.a \
     ./scripts/build-example.sh web
 ```
 
-For existing installations, use the same final command with their absolute paths.
-The archive must contain Wasm objects and use the same Emscripten version as the
-final link. The build uses Odin's `RAYLIB_WASM_LIB=env.o` binding mode to resolve
-raylib through that archive. The HTML host supplies Odin runtime imports alongside
+`EMCC` may select a compiler explicitly when paired with `RAYLIB_WEB_LIB`.
+Explicit builds bypass Homebrew and the shared raylib cache; keep archive/compiler
+versions and Odin raylib bindings compatible. Web compilation and linking finish
+in a private directory before outputs replace files in `binaries/web/`.
+The HTML host supplies Odin runtime imports alongside
 Emscripten's imports; replacing it with a generic Emscripten page is insufficient.
 
 Serve `binaries/web/` through your existing static host with a Wasm MIME type. Final
 example outputs belong in `binaries/`; temporary builds, captures and experiments
 belong in `.work/`.
+
+### Linked browser smoke check
+
+Use an already installed Chromium-family executable; the runner uses Node's
+standard library and Chromium's debugging pipe, with no npm package or browser
+download. Supply its executable path through `CHROMIUM_BIN` (default `chromium`):
+
+```sh
+CHROMIUM_BIN=/absolute/path/to/chromium ./scripts/check-web.sh
+# Include the linked check after the full compiler/spec/test/linter suite:
+CHECK_WEB=1 CHROMIUM_BIN=/absolute/path/to/chromium ./scripts/check.sh
+```
+
+The same SDK/archive overrides apply. A temporary debug build exports a small
+read-only showcase snapshot for precise assertions; ordinary builds omit that
+export. The runner serves only that temporary build on an ephemeral loopback
+port, launches an isolated headless browser, and checks Wasm startup, actual
+pointer click/cancellation, Tab/Shift+Tab through GLFW, focus-loss cancellation,
+held-key release, outside HTML controls and browser defaults, UTF-8 editing and
+narrow-viewport resizing. Browser errors, failed assertions,
+missing dependencies and timeouts fail the command. The browser, server and
+scratch files are closed on completion. The default CI job runs the portable
+suite, including the maintained capture and host tests; the linked check is
+explicit because it additionally needs Emscripten, web raylib and Chromium.
+This is a headless runtime check, not graphical playtesting or evidence for
+Android/iOS or another browser engine.
 
 ## Specification and provenance
 
@@ -400,3 +447,25 @@ new archive privately before replacing the previous ZIP, and produces
 `binaries/SHA256SUMS.txt`. Tag the checked commit, push it and attach both files
 to the corresponding GitHub release. GitHub also supplies full repository source
 archives; those include the tests and showcase as well.
+
+## Shared dependency management
+
+On this Mac, use Homebrew's Odin installation and its managed LLVM/raylib
+dependencies: `brew install odin`. Project launchers prefer that compiler;
+explicit compiler overrides remain available for testing exact versions. Other
+platforms may use the required official Odin release on `PATH`.
+Do not download another compiler bundle into the checkout. Historical exact
+nightly binaries are retained once under `~/.local/share/dev-pool/odin/`, with
+compatibility links for already captured jobs.
+
+### Compiler vetting policy
+
+Compiler verification uses maximal compatible vetting on first-party packages:
+`-vet -vet-tabs -vet-using-param -vet-nil-deref -vet-uninitialized
+-vet-atomic-access -strict-style -warnings-as-errors`. Package scopes preserve
+vendored dependencies and public APIs. Additional `-vet-unused-procedures`
+checks use closed application entry points; attributed test procedures are not
+classified as unused, because this compiler incorrectly reports them even under
+`odin test`. All other vet checks still cover tests and library code. Keep the
+existing targets, collections and defines. Compiler failure prevents shared lint;
+report existing findings without weakening the checks.

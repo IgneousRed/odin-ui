@@ -87,12 +87,13 @@ frame :: proc(app: ^App, width, height: f32) {
 		}
 	} else {app.press = {}}
 	app.pointer = pointer
-	if rl.IsKeyPressed(.TAB) {
+	keyboard_focused := rl.IsWindowFocused()
+	if keyboard_focused && rl.IsKeyPressed(.TAB) {
 		app.focused = input.focus_next(app.focused, []int{1, 2}, rl.IsKeyDown(.LEFT_SHIFT) || rl.IsKeyDown(.RIGHT_SHIFT))
 		app.editing = app.focused == 2
 	}
-	if app.focused == 1 && (rl.IsKeyPressed(.ENTER) || rl.IsKeyPressed(.SPACE)) {app.clicks += 1}
-	if app.editing {
+	if keyboard_focused && app.focused == 1 && (rl.IsKeyPressed(.ENTER) || rl.IsKeyPressed(.SPACE)) {app.clicks += 1}
+	if keyboard_focused && app.editing {
 		if (rl.IsKeyDown(.LEFT_CONTROL) || rl.IsKeyDown(.RIGHT_CONTROL) || rl.IsKeyDown(.LEFT_SUPER) || rl.IsKeyDown(.RIGHT_SUPER)) && rl.IsKeyPressed(.A) {edit_name(app, .select_all)}
 		if rl.IsKeyPressed(.BACKSPACE) {edit_name(app, .backspace)}
 		if rl.IsKeyPressed(.LEFT) {edit_name(app, .left, extend = rl.IsKeyDown(.LEFT_SHIFT) || rl.IsKeyDown(.RIGHT_SHIFT))}
@@ -119,8 +120,8 @@ frame :: proc(app: ^App, width, height: f32) {
 	hovered := ui.contains_resolved(resolved, count, {pointer.position.x, pointer.position.y})
 	fill := ACCENT if hovered else PANEL
 	if app.press.active {fill = BACKGROUND}
-	focus := ACCENT if app.editing else rl.Color{}
-	button_focus := rl.WHITE if app.focused == 1 else rl.Color{}
+	focus := ACCENT if keyboard_focused && app.editing else rl.Color{}
+	button_focus := rl.WHITE if keyboard_focused && app.focused == 1 else rl.Color{}
 	rl.BeginDrawing()
 	rl.ClearBackground(BACKGROUND)
 	paint: ui.Paint
@@ -128,7 +129,7 @@ frame :: proc(app: ^App, width, height: f32) {
 	ui.paint_text(&paint, title, {rl.WHITE})
 	ui.paint_text(&paint, description, {rl.LIGHTGRAY})
 	ui.paint_button(&paint, count, {background = fill, foreground = rl.WHITE, border = ACCENT, focus = button_focus})
-	ui.paint_field(&paint, name, {background = PANEL, foreground = rl.WHITE, border = ACCENT, focus = focus, selection = app.selection, selection_background = ACCENT, cursor = app.editing && int(rl.GetTime() * 2) % 2 == 0})
+	ui.paint_field(&paint, name, {background = PANEL, foreground = rl.WHITE, border = ACCENT, focus = focus, selection = app.selection, selection_background = ACCENT, cursor = keyboard_focused && app.editing && int(rl.GetTime() * 2) % 2 == 0})
 	ui.paint_bar(&paint, progress, {f32(app.clicks % 11) / 10, ACCENT, PANEL})
 	ui.paint_text(&paint, footer, {rl.LIGHTGRAY})
 	ui.end_paint(&paint)
@@ -140,4 +141,21 @@ edit_name :: proc(app: ^App, operation: text.Edit, inserted: string = "", extend
 	if len(value) > len(app.name) {return}
 	copy(app.name[:], value)
 	app.name_length, app.selection = len(value), selection
+}
+
+// Disposable inspection data for the temporary linked-browser smoke build.
+when #config(UI_WEB_SMOKE, false) {
+	smoke_snapshot :: proc(app: ^App) -> cstring {
+		button, field: ui.Layout_Rect
+		for index in 0 ..< ui.layout_count(app.resolved) {
+			node, _ := ui.geometry(app.resolved, ui.layout_handle(app.resolved, index))
+			if node.trigger.path == "count" {button = node.rect}
+			if node.trigger.path == "name" {field = node.rect}
+		}
+		return fmt.ctprintf(`{{"clicks":%d,"name":%q,"button":[%f,%f,%f,%f],"field":[%f,%f,%f,%f],"width":%f,"height":%f}}`,
+			app.clicks, string(app.name[:app.name_length]),
+			button.x, button.y, button.width, button.height,
+			field.x, field.y, field.width, field.height,
+			app.viewport.x, app.viewport.y)
+	}
 }

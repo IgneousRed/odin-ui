@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.1 (unreleased)
+
+1. Keep showcase keyboard input inside its focused canvas. Outside HTML controls
+   retain normal activation, typing, Backspace and Tab; blur releases held keys
+   and hides canvas focus indicators and the caret.
+2. Share portable hit testing, scissor validation and scrollbar geometry between
+   the two-pass and compatibility adapters without changing their public APIs.
+3. Document host-owned frame failure handling and add a portable runnable example
+   covering safe retention, state/viewport invalidation, disabled actions and recovery.
+4. Retain drawing and host regression checks in the standard suite. Add an
+   optional linked Chromium check for startup, pointer input, focus, editing and
+   resize using temporary inspection exports instead of a production API.
+5. Share checksum-verified Homebrew web raylib builds while retaining explicit
+   SDK/archive overrides. Prepare linked artifacts privately and rebuild corrupt
+   cache records as well as corrupt archives.
+6. Upgrade the reviewed GitHub-pinned shared Odin linter to 0.7.1 at commit
+   `949293b8a7fcff8f72927b5afb5c5ada8b2df896`; preserve all compiler and lint gates.
+
 ## 0.2.0
 
 1. Added explicit layout builders, generation-checked node handles, resolved views

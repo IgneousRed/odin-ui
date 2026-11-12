@@ -20,11 +20,11 @@ var Module = (() => {
   const odinImports = odin.setupDefaultImports(memory);
   const failed = error => { status.hidden = false; status.textContent = 'Unable to start Odin UI.'; console.error(error); };
   canvas.addEventListener('pointerdown', () => canvas.focus());
-  // GLFW captures Tab on window; leave its default browser navigation intact.
-  window.addEventListener('keydown', event => {
-    if (event.key === 'Tab' && event.target === canvas) event.stopImmediatePropagation();
+  // Registered before GLFW: Tab keeps its default browser focus navigation.
+  canvas.addEventListener('keydown', event => {
+    if (event.key === 'Tab') event.stopImmediatePropagation();
+    else if (['Backspace','ArrowLeft','ArrowRight'].includes(event.key)) event.preventDefault();
   }, true);
-  canvas.addEventListener('keydown', event => { if (['Backspace','ArrowLeft','ArrowRight'].includes(event.key)) event.preventDefault(); });
   return {
     canvas, odinImports, print: console.log, printErr: console.error, onAbort: failed,
     instantiateWasm(imports, ready) {
@@ -42,6 +42,16 @@ var Module = (() => {
       try {
         wasmExports._start();
         wasmExports.ui_start();
+        // GLFW installs window-wide keyboard handlers. Scope them to the canvas
+        // so embedding pages keep their own controls and browser defaults.
+        for (const [type, listener] of [
+          ['keydown', GLFW.onKeydown], ['keypress', GLFW.onKeyPress], ['keyup', GLFW.onKeyup]
+        ]) {
+          window.removeEventListener(type, listener, true);
+          canvas.addEventListener(type, listener, true);
+        }
+        // Release keys held while focus leaves; their keyup may go elsewhere.
+        canvas.addEventListener('blur', GLFW.onBlur, true);
         status.hidden = true;
         canvas.focus();
         function frame() {

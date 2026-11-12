@@ -277,3 +277,105 @@ no formula update. No parallel toolchain or new dependency was installed.
 Exact commands, before/final logs (including failed attempts), reviewer findings,
 headless probes, selected-tree verification and source snapshots are retained
 under `.work/sol-finish-fl90z7fc/`.
+
+
+## 2026-11-12 maintained regression and web checks
+
+Promoted the earlier field-capture probes into `tests/draw_tests`, using Odin
+exports to intercept drawing while retaining real raylib text measurement.
+The two tests retain eleven caret/blink cases, ten multiline overlay cases and
+ordinary button centering. macOS uses shared-library interposition; Linux uses
+static-link symbol wrapping. Tests serialize raylib's global line-spacing state.
+The standard runner now also executes maintained Node host-event/import checks
+and five explicit/default web-toolchain resolver tests alongside the six existing
+shared-cache tests. Compiler gates include the temporary smoke-build define.
+
+The shared Homebrew web dependency path remains the default. Explicit
+`EMSDK`/`EMCC` plus `RAYLIB_WEB_LIB` selections bypass Homebrew/cache resolution.
+Web link outputs are prepared privately. `scripts/check-web.sh` builds into a
+temporary directory and runs the actual host in an isolated installed Chromium
+through its debugging pipe, without npm packages or browser installation.
+Smoke inspection exports are absent from ordinary web builds.
+
+Validation: `CHECK_WEB=1 ./scripts/check.sh` with explicit local Node/Chromium
+executable paths passed all compiler targets/defines, Allium, 58 Odin tests,
+11 Python tests, Node host checks, the packaged native/Wasm consumer and every
+rule of the unchanged GitHub-pinned shared linter. The linked Chromium check
+passed startup, real click/outside-release cancellation, Tab/Shift+Tab from the
+canvas, focus-loss cancellation, UTF-8 deletion/insertion/navigation and narrow
+resize. Missing-browser setup fails with actionable guidance and cleans up.
+Normal desktop and explicit-archive web debug builds passed; Wasm export
+inspection confirms the normal artifact omits `ui_smoke_snapshot`.
+Linux draw-capture sources pass maximal compiler type checks; Linux runtime/CI
+execution and graphical playtesting were not performed. No library public API
+or production failure-presentation policy changed.
+
+Commands and logs for this work are retained under `.work/todo-cleanup/`.
+
+
+## 2026-11-12 host-owned frame failure policy
+
+Resolved the specification's production successor-failure question with a
+reference host policy in `docs/frame-failures.md`, linked from the ownership
+contract. Retention requires valid backing/borrowed data and current state plus
+viewport correspondence. Otherwise the host cancels capture, suspends ordinary
+UI actions and draws an independent error surface until a valid successor is
+presented. The development showcase keeps its fail-fast assertion.
+
+The portable `examples/failure_policy` program demonstrates two caller-owned
+node arrays and presentation arenas, independent scratch reset and capture
+cancellation. Seven asserted scenarios cover successful publication, unchanged
+state retention, repeated changed-state failures, recovery, viewport invalidation
+and recovery at the new viewport. Its console fallback stands in for the guide's
+raylib error-drawing branch. No persistent application store, library session,
+state rollback or new public API was introduced.
+
+`NODE=/opt/homebrew/bin/node ./scripts/check.sh` passes Allium, all native/Wasm
+compiler gates including the new example and its closed-entry-point unused
+checks, 58 Odin tests, 11 Python tests, Node host checks, the packaged consumer
+and every unchanged GitHub-pinned shared lint rule. The example also ran directly
+under maximal scoped vetting. Logs are under `.work/frame-failures/`.
+
+During final review after that successful check, concurrent edits appeared in
+`src/raylib/raylib.odin` and `tests/consumer/main.odin`. This task did not edit
+those files. The recorded pass does not certify those newly changed sources;
+the final broad whitespace check also found a new EOF blank line in the adapter.
+The policy/example/documentation diff itself passes whitespace checks.
+
+
+## 2026-11-12 sol-finish review of two-pass follow-ups
+
+Six `gpt-6.1-sol` high-reasoning reviews covered simplification, bugs and UI in
+two cohorts, exchanging findings directly. The follow-up review settled after
+small cache-metadata and documentation fixes. Shared portable hit testing,
+scissor validation and scrollbar bounds replace duplicated adapter calculations;
+public APIs remain available. Full-string paragraph measurement is retained
+because it also validates intrinsic measurements before wrapping.
+
+The linked Chromium reproduction established that Enter on an outside HTML
+button also activated the canvas counter. The host now scopes GLFW keyboard
+listeners to its canvas and releases held keys on canvas blur; the showcase also
+checks actual focus before keyboard input and focus/caret appearance. Maintained
+checks cover outside button activation, typing, Backspace, Tab, held-Shift blur,
+canvas pointer cancellation, UTF-8 editing and resize. A malformed JSON cache
+record now triggers rebuilding instead of an uncaught TypeError.
+
+Reviewed and updated the shared linter to commit
+`949293b8a7fcff8f72927b5afb5c5ada8b2df896` (0.7.1), including the exact upstream
+runner and synchronized lock/documentation. Odin dev-2026-11a, Allium 3.6.1 and
+the recorded showcase font revision remain current. No machine-wide compiler or
+browser installation was performed.
+
+`CHECK_WEB=1 CHROMIUM_BIN=<installed Chromium> ./scripts/check.sh` passed all
+native/Wasm compiler targets and defines, Allium, 63 Odin tests, 12 Python tests,
+Node host checks, the packaged native/Wasm consumer, every pinned shared lint
+rule and linked Chromium runtime checks. The first full attempt stopped at an
+Odin compiler segmentation fault during the copied consumer; a focused retry
+and the subsequent complete run passed. Compiler failure correctly prevented
+lint in the failed attempt. Logs and the reproduction are under
+`.work/sol-finish-*.log` and `.work/sol-finish-focus-web/`.
+
+No timings were used to infer speed: background workloads make those comparisons
+invalid. GitHub Actions credentials and checked release gating remain explicitly
+deferred in TODO.md. Version 0.2.1 is prepared locally; no new release is claimed
+without remote verification.

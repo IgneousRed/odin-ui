@@ -129,13 +129,12 @@ contract LayoutResolution {
 
     @invariant ResolutionFailure
         -- A failed screen never becomes presented. Development fails immediately so
-        -- the declaration defect is visible. Production failure handling remains an
-        -- explicit policy decision rather than silently presenting geometry that no
-        -- longer agrees with application state.
+        -- the declaration defect is visible. The reference production host policy
+        -- retains a previous successful frame only while its storage and borrowed
+        -- data remain valid and it still describes current state and viewport.
+        -- Otherwise the host clears outstanding capture, suspends ordinary UI
+        -- actions and presents its own error surface independent of failed layout.
+        -- Only a successfully finalized successor resumes ordinary presentation.
+        -- Allocation, state correspondence, error drawing and recovery belong to
+        -- the host; the library reports failure and rejects failed-frame hits.
 }
-
-------------------------------------------------------------
--- Open Questions
-------------------------------------------------------------
-
-open question "What should production present when construction or resolution of a successor screen fails?"

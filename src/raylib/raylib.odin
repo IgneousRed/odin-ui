@@ -415,24 +415,13 @@ paint_scrollbar :: proc(paint: ^Paint, handle: Node_Handle, color: rl.Color) -> 
 	style := paint.resolved.owner.frame.nodes[handle.index].style
 	if !style.scroll || node.max_scroll <= 0 || color.a == 0 || !paint_clip(paint, node) {return true}
 	defer rl.EndScissorMode()
-	horizontal := style.direction == .horizontal
-	extent := node.rect.width if horizontal else node.rect.height
-	track := max(0, extent - 2 * SCROLLBAR_INSET)
-	thumb := min(track, max(SCROLLBAR_MIN_THUMB, track * track / (track + node.max_scroll)))
-	offset := SCROLLBAR_INSET + (track - thumb) * clamp(style.scroll_offset / node.max_scroll, 0, 1)
-	bounds := rl.Rectangle{node.rect.x + node.rect.width - SCROLLBAR_INSET, node.rect.y + offset, SCROLLBAR_WIDTH, thumb}
-	if horizontal {bounds = {node.rect.x + offset, node.rect.y + node.rect.height - SCROLLBAR_INSET, thumb, SCROLLBAR_WIDTH}}
-	rl.DrawRectangleRec(bounds, color)
+	rl.DrawRectangleRec(scrollbar_bounds(node.rect, style.direction == .horizontal, node.max_scroll, style.scroll_offset), color)
 	return true
 }
 
 hit_resolved :: proc(resolved: Resolved_Layout, point: rl.Vector2) -> Trigger {
-	for index := layout_count(resolved) - 1; index >= 0; index -= 1 {
-		handle := layout_handle(resolved, index)
-		node, _ := geometry(resolved, handle)
-		if (node.trigger.path != "" || node.trigger.data != nil) && contains_resolved(resolved, handle, point) {return node.trigger}
-	}
-	return {}
+	if layout_count(resolved) == 0 {return {}}
+	return layout.hit(&resolved.owner.frame, {point.x, point.y})
 }
 
 layout_text :: proc(resolved: Resolved_Layout, handle: Node_Handle) -> (value: string, centered: bool, ok: bool) {
@@ -574,14 +563,7 @@ draw :: proc(ui: ^UI, scale: f32 = 1) {
 	for &node, index in ui.nodes[:ui.count] {
 		style := node.style
 		if !style.scroll || node.max_scroll <= 0 || style.scroll_color.a == 0 || !begin_clip(ui, index, scale) {continue}
-		horizontal := style.direction == .horizontal
-		extent := node.rect.width if horizontal else node.rect.height
-		track := max(0, extent - 2 * SCROLLBAR_INSET)
-		thumb := min(track, max(SCROLLBAR_MIN_THUMB, track * track / (track + node.max_scroll)))
-		offset := SCROLLBAR_INSET + (track - thumb) * clamp(style.scroll_offset / node.max_scroll, 0, 1)
-		bounds := rl.Rectangle{node.rect.x + node.rect.width - SCROLLBAR_INSET, node.rect.y + offset, SCROLLBAR_WIDTH, thumb}
-		if horizontal {bounds = {node.rect.x + offset, node.rect.y + node.rect.height - SCROLLBAR_INSET, thumb, SCROLLBAR_WIDTH}}
-		rl.DrawRectangleRec(bounds, style.scroll_color)
+		rl.DrawRectangleRec(scrollbar_bounds(node.rect, style.direction == .horizontal, node.max_scroll, style.scroll_offset), style.scroll_color)
 		rl.EndScissorMode()
 	}
 }
@@ -819,17 +801,7 @@ color_hsl :: proc(color: rl.Color) -> HSL {
 begin_clip :: proc(ui: ^UI, index: int, scale: f32 = 1) -> bool {
 	if !ui.resolved || index < 0 || index >= ui.count {return false}
 	node := &ui.nodes[index]
-	clip := intersection(node.clip, node.rect)
-	pixels := layout.pixel_bounds(clip, scale)
-	if pixels.width <= 0 || pixels.height <= 0 {return false}
-	scissor_min := f32(min(i32))
-	// The positive i32 limit is exclusive and exactly representable as f32.
-	scissor_limit := -scissor_min
-	for value in ([6]f32{pixels.x, pixels.y, pixels.width, pixels.height, pixels.x + pixels.width, pixels.y + pixels.height}) {
-		if value < scissor_min || value >= scissor_limit {return false}
-	}
-	rl.BeginScissorMode(i32(pixels.x), i32(pixels.y), i32(pixels.width), i32(pixels.height))
-	return true
+	return begin_scissor(intersection(node.clip, node.rect), scale)
 }
 
 control_padding :: proc(pixel_size: f32) -> f32 {
@@ -943,9 +915,15 @@ measured_layout :: proc(builder: ^Layout_Builder, font: rl.Font, value: string, 
 
 @(private="file")
 paint_clip :: proc(paint: ^Paint, node: Resolved_Node) -> bool {
-	pixels := layout.pixel_bounds(intersection(node.clip, node.rect), paint.scale)
+	return begin_scissor(intersection(node.clip, node.rect), paint.scale)
+}
+
+@(private="file")
+begin_scissor :: proc(clip: Layout_Rect, scale: f32) -> bool {
+	pixels := layout.pixel_bounds(clip, scale)
 	if pixels.width <= 0 || pixels.height <= 0 {return false}
 	minimum := f32(min(i32))
+	// The positive i32 limit is exclusive and exactly representable as f32.
 	limit := -minimum
 	for value in ([6]f32{pixels.x, pixels.y, pixels.width, pixels.height, pixels.x + pixels.width, pixels.y + pixels.height}) {
 		if value < minimum || value >= limit {return false}
@@ -978,6 +956,16 @@ draw_prepared_text :: proc(content: ^Prepared_Text, bounds: Layout_Rect, color: 
 		if !content.wrap {origin.y += (bounds.height - content.extent.y) / 2}
 		rl.DrawTextCodepoints(content.font, raw_data(line.runes), c.int(len(line.runes)), origin, content.pixel_size, 0, color)
 	}
+}
+
+@(private="file")
+scrollbar_bounds :: proc(rect: Layout_Rect, horizontal: bool, maximum, scroll_offset: f32) -> rl.Rectangle {
+	extent := rect.width if horizontal else rect.height
+	track := max(0, extent - 2 * SCROLLBAR_INSET)
+	thumb := min(track, max(SCROLLBAR_MIN_THUMB, track * track / (track + maximum)))
+	offset := SCROLLBAR_INSET + (track - thumb) * clamp(scroll_offset / maximum, 0, 1)
+	if horizontal {return {rect.x + offset, rect.y + rect.height - SCROLLBAR_INSET, thumb, SCROLLBAR_WIDTH}}
+	return {rect.x + rect.width - SCROLLBAR_INSET, rect.y + offset, SCROLLBAR_WIDTH, thumb}
 }
 
 @(private="file")
