@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0
+
+1. Added explicit layout builders, generation-checked node handles, resolved views
+   and immediate ordered paint operations. Geometry and prepared text are reused
+   without copying the tree; appearance remains outside geometry.
+2. Prepared text runs, wrapping, line positions and field cursor tables during
+   layout. Painting and caret blinking perform no Odin allocation or measurement.
+3. Migrated the showcase and source-copy consumer to the two-pass interface;
+   retained the combined API for existing external consumers. Added migration
+   guidance to the source-copy archive.
+
 ## 0.1.3
 
 - Keep a field's cursor position, text and selection aligned inside constrained

@@ -1,7 +1,7 @@
 # Copy Odin UI into your project
 
-Download `odin_ui-v0.1.3.zip` from the
-[v0.1.3 release](https://github.com/IgneousRed/odin-ui/releases/tag/v0.1.3).
+Download `odin_ui-v0.2.0.zip` from the
+[v0.2.0 release](https://github.com/IgneousRed/odin-ui/releases/tag/v0.2.0).
 Extract its `odin_ui/` folder into your project's `vendor/` directory:
 
 ```text
@@ -16,6 +16,7 @@ my-game/
         ├── raylib/
         ├── LICENSE
         ├── VERSION
+        ├── MIGRATING.md
         └── README.md
 ```
 
@@ -57,7 +58,8 @@ license in that directory and include it with redistributed application builds.
 
 ## Updating your copy
 
-`VERSION` records the release and source URL. Releases in the `0.x` series may
+Read [MIGRATING.md](MIGRATING.md) for the normal two-pass layout/paint API and
+compatibility path. `VERSION` records the release and source URL. Releases in the `0.x` series may
 change the API; read the release notes before updating.
 
 Choose a specific release tag for each update. Normal builds use the committed

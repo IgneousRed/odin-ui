@@ -476,6 +476,30 @@ wrapped_content_obeys_fixed_sizing_and_remains_scrollable :: proc(t: ^testing.T)
 	testing.expect_value(t, frame.nodes[scroll].max_scroll, f32(22))
 }
 
+@(test)
+prepared_field_positions_match_raylib_advances :: proc(t: ^testing.T) {
+	font := monospace_font()
+	font.glyphs['a'].advanceX = 7
+	font.glyphs['b'].advanceX = 0
+	font.glyphs['b'].offsetX = 2
+	font.recs['b'].width = 9
+	value := "abé🙂\naab"
+	builder: imui.Layout_Builder
+	storage: [2]imui.Layout_Node
+	imui.begin_layout(&builder, 200, 100, storage = storage[:])
+	handle := imui.field_layout(&builder, font, value, 13)
+	_, failure := imui.finish_layout(&builder)
+	testing.expect(t, failure == nil)
+	content := storage[handle.index].content
+	start := 0
+	for codepoint, offset in value {
+		expected := imui.measure_text(font, value[start:offset], 13).x
+		testing.expect_value(t, content.positions[offset].x, expected)
+		if codepoint == '\n' {start = offset + 1}
+	}
+	testing.expect_value(t, content.positions[len(value)].x, imui.measure_text(font, value[start:], 13).x)
+}
+
 // No window or GPU is needed to measure this monospace font.
 monospace_font :: proc() -> rl.Font {
 	glyphs:=make([]rl.GlyphInfo,256,context.temp_allocator)

@@ -3,13 +3,8 @@ package consumer
 
 // -------------------------------- Imports --------------------------------
 
-// ---------------- Vendor ----------------
-
-import rl "vendor:raylib"
-
 // ---------------- Project ----------------
 
-import layout "../vendor/odin_ui/layout"
 import text "../vendor/odin_ui/text"
 import input "../vendor/odin_ui/input"
 import ui "../vendor/odin_ui/raylib"
@@ -19,16 +14,20 @@ import ui "../vendor/odin_ui/raylib"
 // ---------------- Public ----------------
 
 main :: proc() {
-	frame: ui.UI
-	ui.begin(&frame, 320, 200, {direction = .vertical, alignment = {.start, .start}})
-	target := ui.layout_leaf(&frame, {width = ui.fixed(100), height = ui.fixed(40)})
-	ui.action(&frame, target, {path = "continue"})
-	ui.bar(&frame, 0.5, 12, rl.BLUE, rl.GRAY)
-	assert(ui.finish(&frame) == nil)
+	frame: ui.Layout_Builder
+	ui.begin_layout(&frame, 320, 200, {direction = .vertical, alignment = {.start, .start}})
+	target := ui.box_layout(&frame, {width = ui.fixed(100), height = ui.fixed(40)})
+	ui.layout_action(&frame, target, {path = "continue"})
+	ui.bar_layout(&frame, 12)
+	resolved, failure := ui.finish_layout(&frame)
+	assert(failure == nil)
+	paint: ui.Paint
+	ui.begin_paint(&paint, resolved)
+	ui.end_paint(&paint)
 
 	point := input.logical_position({scale = 2}, {20, 20})
-	assert(layout.contains(&frame, target, point))
-	assert(ui.hit(&frame, {point.x, point.y}).path == "continue")
+	assert(ui.contains_resolved(resolved, target, {point.x, point.y}))
+	assert(ui.hit_resolved(resolved, {point.x, point.y}).path == "continue")
 	press: input.Press
 	assert(input.button(&press, {position = point, pressed = true, down = true}, true).pressed)
 	assert(input.button(&press, {position = point, released = true}, true).clicked)

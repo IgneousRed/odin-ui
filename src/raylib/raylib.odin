@@ -66,6 +66,75 @@ HSL_SECTOR_DEGREES :: f32(60)
 
 // ---------------- Public ----------------
 
+// Normal two-pass API. The legacy UI/Style builders below remain compatible.
+// Keep a builder in place; handles and resolved views borrow its identity and storage.
+Paint :: struct {resolved: Resolved_Layout, scale: f32, active: bool}
+
+Resolved_Layout :: struct {owner: ^Layout_Builder, generation: u64}
+
+Node_Handle :: struct {owner: ^Layout_Builder, generation: u64, index: int}
+
+Layout_Builder :: struct {
+	frame: layout.Frame(^Prepared_Text, No_Color),
+	generation: u64,
+}
+
+Layout_Node :: layout.Node(^Prepared_Text, No_Color)
+
+// No appearance values occupy geometry storage.
+No_Color :: struct {}
+
+Geometry :: struct {
+	direction: layout.Direction,
+	width, height: Size,
+	padding: layout.Padding,
+	gap: f32,
+	alignment: layout.Alignment,
+	radius: f32,
+	clip_content, scroll: bool,
+	scroll_offset: f32,
+}
+
+Resolved_Node :: struct {
+	rect, clip: Layout_Rect,
+	max_scroll, radius: f32,
+	trigger: Trigger,
+	first_child: int,
+}
+
+Box_Paint :: struct {background, border, focus: rl.Color}
+
+Text_Paint :: struct {color: rl.Color}
+
+Button_Paint :: struct {
+	background, foreground, border, focus: rl.Color,
+}
+
+Field_Paint :: struct {
+	background, foreground, border, focus, selection_background: rl.Color,
+	selection: text_core.Selection,
+	cursor: bool,
+}
+
+Bar_Paint :: struct {value: f32, color, background: rl.Color}
+
+// Text and font resources must remain alive through paint and presented-frame input.
+Prepared_Text :: struct {
+	value: string,
+	font: rl.Font,
+	pixel_size: f32,
+	wrap, centered, control, field: bool,
+	extent: rl.Vector2,
+	lines: []Prepared_Line,
+	positions: []rl.Vector2,
+}
+
+Prepared_Line :: struct {
+	runes: []rune,
+	width, y: f32,
+	start, end: int,
+}
+
 UI :: layout.Frame(Layout_Content, rl.Color)
 
 Node :: layout.Node(Layout_Content, rl.Color)
@@ -122,6 +191,277 @@ Layout_Failure :: layout.Failure
 // -------------------------------- Procedures --------------------------------
 
 // ---------------- Public ----------------
+
+begin_layout :: proc(builder: ^Layout_Builder, width, height: f32, geometry: Geometry = {}, allocator: mem.Allocator = context.temp_allocator, storage: []Layout_Node = nil) -> Node_Handle {
+	assert(builder.generation < max(u64), "Layout generation exhausted")
+	builder.generation += 1
+	layout.begin(&builder.frame, width, height, geometry_style(geometry), allocator, storage)
+	return {builder, builder.generation, 0}
+}
+
+row_layout :: proc(builder: ^Layout_Builder, geometry: Geometry = {}) -> Node_Handle {
+	value := geometry
+	value.direction = .horizontal
+	return {builder, builder.generation, layout.open(&builder.frame, geometry_style(value))}
+}
+
+column_layout :: proc(builder: ^Layout_Builder, geometry: Geometry = {}) -> Node_Handle {
+	value := geometry
+	value.direction = .vertical
+	return {builder, builder.generation, layout.open(&builder.frame, geometry_style(value))}
+}
+
+close_layout :: proc(builder: ^Layout_Builder) {layout.close(&builder.frame)}
+
+// Geometry can be revised during declaration, never through a resolved view.
+set_geometry :: proc(builder: ^Layout_Builder, handle: Node_Handle, geometry: Geometry) -> bool {
+	if handle.owner != builder || handle.generation != builder.generation || handle.index < 0 || handle.index >= builder.frame.count || builder.frame.resolved || builder.frame.failure != nil {return false}
+	// Validate using the same gate as construction without adding a node.
+	probe: layout.Frame(^Prepared_Text, No_Color)
+	nodes: [1]Layout_Node
+	layout.begin(&probe, 0, 0, geometry_style(geometry), storage = nodes[:])
+	if probe.failure != nil {return false}
+	builder.frame.nodes[handle.index].style = geometry_style(geometry)
+	return true
+}
+
+text_layout :: proc(builder: ^Layout_Builder, font: rl.Font, value: string, pixel_size: f32, options: Text_Options = {}) -> Node_Handle {
+	return measured_layout(builder, font, value, pixel_size, options, false, false, false, true)
+}
+
+paragraph_layout :: proc(builder: ^Layout_Builder, font: rl.Font, value: string, pixel_size: f32, centered: bool = false, width: Size = layout.Grow{}) -> Node_Handle {
+	return measured_layout(builder, font, value, pixel_size, {width = width}, true, false, false, centered)
+}
+
+button_layout :: proc(builder: ^Layout_Builder, font: rl.Font, value: string, pixel_size: f32, trigger: Trigger = {}, options: Text_Options = {}) -> Node_Handle {
+	handle := measured_layout(builder, font, value, pixel_size, options, false, true, false, true)
+	layout_action(builder, handle, trigger)
+	return handle
+}
+
+field_layout :: proc(builder: ^Layout_Builder, font: rl.Font, value: string, pixel_size: f32, trigger: Trigger = {}, options: Text_Options = {}) -> Node_Handle {
+	handle := measured_layout(builder, font, value, pixel_size, options, false, true, true, true)
+	layout_action(builder, handle, trigger)
+	return handle
+}
+
+bar_layout :: proc(builder: ^Layout_Builder, height: f32) -> Node_Handle {
+	return box_layout(builder, {width = grow(), height = fixed(height)})
+}
+
+separator_layout :: proc(builder: ^Layout_Builder, width: f32 = 1) -> Node_Handle {
+	if builder.frame.depth == 0 {return box_layout(builder)}
+	direction := builder.frame.nodes[builder.frame.stack[builder.frame.depth - 1].index].style.direction
+	return box_layout(builder, {width = grow() if direction == .vertical else fixed(width), height = fixed(width) if direction == .vertical else grow()})
+}
+
+space_layout :: proc(builder: ^Layout_Builder) -> Node_Handle {
+	return box_layout(builder, {width = grow(), height = grow()})
+}
+
+box_layout :: proc(builder: ^Layout_Builder, geometry: Geometry = {}, intrinsic: layout.Vec2 = {}) -> Node_Handle {
+	return {builder, builder.generation, layout.leaf(&builder.frame, geometry_style(geometry), intrinsic)}
+}
+
+layout_action :: proc(builder: ^Layout_Builder, handle: Node_Handle, trigger: Trigger) -> bool {
+	if handle.owner != builder || handle.generation != builder.generation || handle.index < 0 || handle.index >= builder.frame.count || builder.frame.resolved || builder.frame.failure != nil {return false}
+	layout.action(&builder.frame, handle.index, trigger)
+	return true
+}
+
+measure_layout_width :: proc(builder: ^Layout_Builder, handle: Node_Handle) -> f32 {
+	if handle.owner != builder || handle.generation != builder.generation || handle.index < 0 || handle.index >= builder.frame.count {return 0}
+	return layout.measure_width(&builder.frame, handle.index)
+}
+
+finish_layout :: proc(builder: ^Layout_Builder) -> (resolved: Resolved_Layout, failure: Layout_Failure) {
+	frame := &builder.frame
+	if frame.resolved {return {builder, builder.generation}, frame.failure}
+	if failure = layout.finish(frame); failure != nil {return}
+	// Width resolution is independent of intrinsic height in the portable engine.
+	// Resolve widths, prepare wrapping, then resolve the resulting heights once.
+	wrapped := false
+	for &node in frame.nodes[:frame.count] {
+		content := node.content
+		if content == nil || !content.wrap {continue}
+		wrapped = true
+		font := content.font
+		lines := text_core.lines(content.value, node.rect.width, content.pixel_size, measure_for_wrap, &font, frame.allocator)
+		content.lines = make([]Prepared_Line, len(lines), frame.allocator)
+		for line, index in lines {
+			content.lines[index] = {runes = utf8.string_to_runes(line, frame.allocator), width = measure_text(font, line, content.pixel_size).x, y = f32(index) * (content.pixel_size + TEXT_LINE_GAP)}
+		}
+		node.intrinsic.y = f32(len(lines)) * content.pixel_size + f32(max(0, len(lines) - 1)) * TEXT_LINE_GAP
+	}
+	if wrapped {
+		frame.resolved = false
+		if failure = layout.finish(frame); failure != nil {return}
+	}
+	for &node in frame.nodes[:frame.count] {
+		content := node.content
+		if content == nil || content.wrap {continue}
+		line_count := 1 + strings.count(content.value, "\n")
+		content.lines = make([]Prepared_Line, line_count, frame.allocator)
+		step := measure_text(content.font, "\n", content.pixel_size).y - content.pixel_size
+		start, line_index := 0, 0
+		field_scale: f32
+		if content.field && content.font.texture.id != 0 && rl.IsFontValid(content.font) {field_scale = content.pixel_size / f32(content.font.baseSize)}
+		if content.field {content.positions = make([]rl.Vector2, len(content.value) + 1, frame.allocator)}
+		for end in 0 ..= len(content.value) {
+			if end < len(content.value) && content.value[end] != '\n' {continue}
+			line := content.value[start:end]
+			content.lines[line_index] = {utf8.string_to_runes(line, frame.allocator), measure_text(content.font, line, content.pixel_size).x, f32(line_index) * step, start, end}
+			if content.field {
+				// Match raylib's zero-spacing advance rule, accumulating font units
+				// before scaling. Measuring every prefix would cost quadratic memory.
+				advance: f32
+				for codepoint, offset in line {
+					content.positions[start + offset] = {advance * field_scale, f32(line_index) * step}
+					if field_scale != 0 {
+						glyph_index := rl.GetGlyphIndex(content.font, codepoint)
+						glyph := content.font.glyphs[glyph_index]
+						advance += f32(glyph.advanceX) if glyph.advanceX > 0 else content.font.recs[glyph_index].width + f32(glyph.offsetX)
+					}
+				}
+				content.positions[end] = {content.lines[line_index].width, f32(line_index) * step}
+			}
+			start, line_index = end + 1, line_index + 1
+		}
+	}
+	return {builder, builder.generation}, nil
+}
+
+begin_paint :: proc(paint: ^Paint, resolved: Resolved_Layout, scale: f32 = 1) {
+	paint^ = {resolved, scale, true}
+}
+
+end_paint :: proc(paint: ^Paint) {paint.active = false}
+
+paint_box :: proc(paint: ^Paint, handle: Node_Handle, appearance: Box_Paint) -> bool {
+	node, ok := geometry(paint.resolved, handle)
+	if !paint.active || !ok {return false}
+	if !paint_clip(paint, node) {return true}
+	defer rl.EndScissorMode()
+	draw_paint_box(node, appearance)
+	return true
+}
+
+paint_text :: proc(paint: ^Paint, handle: Node_Handle, appearance: Text_Paint) -> bool {
+	node, ok := geometry(paint.resolved, handle)
+	if !paint.active || !ok {return false}
+	content := paint.resolved.owner.frame.nodes[handle.index].content
+	if content == nil {return false}
+	if !paint_clip(paint, node) {return true}
+	defer rl.EndScissorMode()
+	draw_prepared_text(content, node.rect, appearance.color)
+	return true
+}
+
+paint_button :: proc(paint: ^Paint, handle: Node_Handle, appearance: Button_Paint) -> bool {
+	node, ok := geometry(paint.resolved, handle)
+	if !paint.active || !ok {return false}
+	content := paint.resolved.owner.frame.nodes[handle.index].content
+	if content == nil || !content.control || content.field {return false}
+	if !paint_clip(paint, node) {return true}
+	defer rl.EndScissorMode()
+	draw_paint_box(node, {appearance.background, appearance.border, appearance.focus})
+	draw_prepared_text(content, node.rect, appearance.foreground)
+	return true
+}
+
+paint_field :: proc(paint: ^Paint, handle: Node_Handle, appearance: Field_Paint) -> bool {
+	node, ok := geometry(paint.resolved, handle)
+	if !paint.active || !ok {return false}
+	content := paint.resolved.owner.frame.nodes[handle.index].content
+	if content == nil || !content.field {return false}
+	if !paint_clip(paint, node) {return true}
+	defer rl.EndScissorMode()
+	draw_paint_box(node, {appearance.background, appearance.border, appearance.focus})
+	anchor := text_boundary(content.value, appearance.selection.anchor)
+	cursor := text_boundary(content.value, appearance.selection.cursor)
+	origin := rl.Vector2{node.rect.x + (node.rect.width - content.extent.x) / 2, node.rect.y + (node.rect.height - content.extent.y) / 2}
+	padding := min(control_padding(content.pixel_size), max(0, (node.rect.width - BORDER_WIDTH) / 2))
+	left := node.rect.x + padding
+	right := max(left, node.rect.x + node.rect.width - padding - BORDER_WIDTH)
+	cursor_x := origin.x + content.positions[cursor].x
+	origin.x += clamp(cursor_x, left, right) - cursor_x
+	overlay_y := node.rect.y + (node.rect.height - max(content.pixel_size, content.extent.y)) / 2
+	first, last := min(anchor, cursor), max(anchor, cursor)
+	for line in content.lines {
+		start, end := max(first, line.start), min(last, line.end)
+		if start < end {rl.DrawRectangleRec({origin.x + content.positions[start].x, overlay_y + line.y, content.positions[end].x - content.positions[start].x, content.pixel_size}, appearance.selection_background)}
+		rl.DrawTextCodepoints(content.font, raw_data(line.runes), c.int(len(line.runes)), {origin.x, origin.y + line.y}, content.pixel_size, 0, appearance.foreground)
+	}
+	if node.rect.width > control_padding(content.pixel_size) * 2 {
+		rl.DrawRectangleRec({node.rect.x + control_padding(content.pixel_size), node.rect.y + node.rect.height - BORDER_WIDTH - control_padding(content.pixel_size), node.rect.width - control_padding(content.pixel_size) * 2, BORDER_WIDTH}, appearance.foreground)
+	}
+	if appearance.cursor {rl.DrawRectangleRec({origin.x + content.positions[cursor].x, overlay_y + content.positions[cursor].y, BORDER_WIDTH, content.pixel_size}, appearance.foreground)}
+	return true
+}
+
+paint_bar :: proc(paint: ^Paint, handle: Node_Handle, appearance: Bar_Paint) -> bool {
+	node, ok := geometry(paint.resolved, handle)
+	if !paint.active || !ok {return false}
+	if !paint_clip(paint, node) {return true}
+	defer rl.EndScissorMode()
+	rl.DrawRectangleRec(raylib_rect(node.rect), appearance.background)
+	rl.DrawRectangleRec({node.rect.x, node.rect.y, node.rect.width * clamp(appearance.value, 0, 1), node.rect.height}, appearance.color)
+	return true
+}
+
+paint_scrollbar :: proc(paint: ^Paint, handle: Node_Handle, color: rl.Color) -> bool {
+	node, ok := geometry(paint.resolved, handle)
+	if !paint.active || !ok {return false}
+	style := paint.resolved.owner.frame.nodes[handle.index].style
+	if !style.scroll || node.max_scroll <= 0 || color.a == 0 || !paint_clip(paint, node) {return true}
+	defer rl.EndScissorMode()
+	horizontal := style.direction == .horizontal
+	extent := node.rect.width if horizontal else node.rect.height
+	track := max(0, extent - 2 * SCROLLBAR_INSET)
+	thumb := min(track, max(SCROLLBAR_MIN_THUMB, track * track / (track + node.max_scroll)))
+	offset := SCROLLBAR_INSET + (track - thumb) * clamp(style.scroll_offset / node.max_scroll, 0, 1)
+	bounds := rl.Rectangle{node.rect.x + node.rect.width - SCROLLBAR_INSET, node.rect.y + offset, SCROLLBAR_WIDTH, thumb}
+	if horizontal {bounds = {node.rect.x + offset, node.rect.y + node.rect.height - SCROLLBAR_INSET, thumb, SCROLLBAR_WIDTH}}
+	rl.DrawRectangleRec(bounds, color)
+	return true
+}
+
+hit_resolved :: proc(resolved: Resolved_Layout, point: rl.Vector2) -> Trigger {
+	for index := layout_count(resolved) - 1; index >= 0; index -= 1 {
+		handle := layout_handle(resolved, index)
+		node, _ := geometry(resolved, handle)
+		if (node.trigger.path != "" || node.trigger.data != nil) && contains_resolved(resolved, handle, point) {return node.trigger}
+	}
+	return {}
+}
+
+layout_text :: proc(resolved: Resolved_Layout, handle: Node_Handle) -> (value: string, centered: bool, ok: bool) {
+	if _, valid := geometry(resolved, handle); !valid {return}
+	content := resolved.owner.frame.nodes[handle.index].content
+	if content == nil {return}
+	return content.value, content.centered, true
+}
+
+contains_resolved :: proc(resolved: Resolved_Layout, handle: Node_Handle, point: rl.Vector2) -> bool {
+	node, ok := geometry(resolved, handle)
+	return ok && rounded_rect_contains(point, node.clip, 0) && rounded_rect_contains(point, node.rect, node.radius)
+}
+
+layout_handle :: proc(resolved: Resolved_Layout, index: int) -> Node_Handle {
+	if index < 0 || index >= layout_count(resolved) {return {}}
+	return {resolved.owner, resolved.generation, index}
+}
+
+geometry :: proc(resolved: Resolved_Layout, handle: Node_Handle) -> (node: Resolved_Node, ok: bool) {
+	if handle.owner != resolved.owner || handle.generation != resolved.generation || handle.index < 0 || handle.index >= layout_count(resolved) {return}
+	value := &resolved.owner.frame.nodes[handle.index]
+	return {value.rect, value.clip, value.max_scroll, value.style.radius, value.trigger, value.first_child}, true
+}
+
+layout_count :: proc(resolved: Resolved_Layout) -> int {
+	if resolved.owner == nil || resolved.generation != resolved.owner.generation || !resolved.owner.frame.resolved || resolved.owner.frame.failure != nil {return 0}
+	return resolved.owner.frame.count
+}
 
 draw :: proc(ui: ^UI, scale: f32 = 1) {
 	if ui.count == 0 && ui.failure == nil {return}
@@ -568,6 +908,76 @@ node_trigger :: layout.node_trigger
 measure_for_wrap :: proc(value: string, pixel_size: f32, data: rawptr) -> layout.Vec2 {
 	size := measure_text((^rl.Font)(data)^, value, pixel_size)
 	return {size.x, size.y}
+}
+
+
+@(private="file")
+geometry_style :: proc(value: Geometry) -> layout.Style(No_Color) {
+	return {direction = value.direction, width = value.width, height = value.height, padding = value.padding, gap = value.gap, alignment = value.alignment, radius = value.radius, clip_content = value.clip_content, scroll = value.scroll, scroll_offset = value.scroll_offset}
+}
+
+@(private="file")
+measured_layout :: proc(builder: ^Layout_Builder, font: rl.Font, value: string, pixel_size: f32, options: Text_Options, wrap, control, field, centered: bool) -> Node_Handle {
+	size := measure_text(font, value, pixel_size)
+	size.y = max(size.y, pixel_size)
+	intrinsic := layout.Vec2{size.x, size.y}
+	geometry := Geometry{width = options.width, height = options.height}
+	if wrap {
+		intrinsic.y = pixel_size
+		if options.width != nil {intrinsic.x = 0}
+	} else {
+		if control {
+			intrinsic = {control_width(size.x, pixel_size), max(pixel_size, size.y) + control_padding(pixel_size) * 2}
+			geometry.radius = button_radius(pixel_size)
+		}
+		if geometry.width == nil {geometry.width = fixed(intrinsic.x)}
+		if geometry.height == nil {geometry.height = fixed(intrinsic.y)}
+	}
+	handle := box_layout(builder, geometry, intrinsic)
+	if handle.index < 0 {return handle}
+	content := new(Prepared_Text, builder.frame.allocator)
+	content^ = {value = strings.clone(value, builder.frame.allocator), font = font, pixel_size = pixel_size, wrap = wrap, centered = centered, control = control, field = field, extent = size}
+	builder.frame.nodes[handle.index].content = content
+	return handle
+}
+
+@(private="file")
+paint_clip :: proc(paint: ^Paint, node: Resolved_Node) -> bool {
+	pixels := layout.pixel_bounds(intersection(node.clip, node.rect), paint.scale)
+	if pixels.width <= 0 || pixels.height <= 0 {return false}
+	minimum := f32(min(i32))
+	limit := -minimum
+	for value in ([6]f32{pixels.x, pixels.y, pixels.width, pixels.height, pixels.x + pixels.width, pixels.y + pixels.height}) {
+		if value < minimum || value >= limit {return false}
+	}
+	rl.BeginScissorMode(i32(pixels.x), i32(pixels.y), i32(pixels.width), i32(pixels.height))
+	return true
+}
+
+@(private="file")
+draw_paint_box :: proc(node: Resolved_Node, appearance: Box_Paint) {
+	box := raylib_rect(node.rect)
+	radius := clamp(node.radius, 0, min(box.width, box.height) / 2)
+	segments := c.int(min(radius / CORNER_SEGMENT_DIVISOR + 1, f32(MAX_CORNER_SEGMENTS)))
+	if appearance.background.a > 0 {rl.DrawRectangleRounded(box, radius * 2 / min(box.width, box.height), segments, appearance.background)}
+	// Both indicators are inside the bounds. A focus ring sits inside the border.
+	for color, index in ([2]rl.Color{appearance.border, appearance.focus}) {
+		inset := BORDER_INSET + f32(index) * BORDER_WIDTH
+		bounds := rl.Rectangle{box.x + inset, box.y + inset, box.width - inset * 2, box.height - inset * 2}
+		if color.a > 0 && bounds.width > 0 && bounds.height > 0 {
+			rl.DrawRectangleRoundedLinesEx(bounds, max(0, radius - inset) * 2 / min(bounds.width, bounds.height), segments, BORDER_WIDTH, color)
+		}
+	}
+}
+
+@(private="file")
+draw_prepared_text :: proc(content: ^Prepared_Text, bounds: Layout_Rect, color: rl.Color) {
+	for line in content.lines {
+		origin := rl.Vector2{bounds.x, bounds.y + line.y}
+		if content.centered {origin.x += (bounds.width - line.width) / 2}
+		if !content.wrap {origin.y += (bounds.height - content.extent.y) / 2}
+		rl.DrawTextCodepoints(content.font, raw_data(line.runes), c.int(len(line.runes)), origin, content.pixel_size, 0, color)
+	}
 }
 
 @(private="file")

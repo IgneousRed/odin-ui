@@ -32,7 +32,7 @@ contract LayoutDefinition {
         -- few constructs into project-specific UI such as a top bar.
 
     @invariant OnlyMeaningfulNodeData
-        -- Nodes carry layout, caller-selected drawing payload and optional trigger data
+        -- Nodes carry geometry, prepared measurement data and optional trigger data
         -- for the current frame. Text, fields and buttons contain text measured by
         -- the builder. Buttons, fields and explicitly actionable containers carry
         -- opaque triggers; ordinary containers and grow space carry no action. A separator infers its orientation from
@@ -57,8 +57,8 @@ contract LayoutDefinition {
     @invariant SingleScreenRepresentation
         -- Resolution fills sizes and absolute positions into the declared screen
         -- nodes. It produces no parallel screen-specific layout value, draw list,
-        -- hit-region list or action table. After success, the same immutable screen
-        -- is sufficient for general drawing and for evaluating the next input.
+        -- hit-region list or action table. After success, the same immutable geometry
+        -- is sufficient for explicit painting and for evaluating the next input.
         -- Repeating finish is read-only. Builder/action changes after success fail;
         -- begin starts the next declaration. Prepared text lines are disposable
         -- derived payloads on these same nodes, not another screen representation.
@@ -106,8 +106,10 @@ contract LayoutResolution {
         -- non-scrolling fit content may compress under AxisResolution.
 
     @invariant GeneralDrawing
-        -- Drawing iterates resolved nodes in declaration order and reads only their
-        -- geometry and drawing data. It reads no MeaningfulState, LocalState or
+        -- The normal paint pass executes explicit commands in supplied order and reads
+        -- resolved geometry plus complete appearance arguments. It performs no
+        -- measurement, wrapping or geometry mutation. Empty paint passes are no-ops.
+        -- Generation-checked handles reject stale frames and other builders. It reads no MeaningfulState, LocalState or
         -- project-specific meaning. Reverse declaration order determines the first
         -- eligible button under a pointer when visible nodes overlap.
 

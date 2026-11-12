@@ -8,7 +8,7 @@ work=$(mktemp -d "$root/.work/package.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 mkdir "$work/odin_ui"
 cp -R src/layout src/text src/input src/raylib "$work/odin_ui/"
-cp LICENSE VERSION "$work/odin_ui/"
+cp LICENSE VERSION MIGRATING.md "$work/odin_ui/"
 cp VENDORING.md "$work/odin_ui/README.md"
 filename="odin_ui-v$version.zip"
 archive="$root/binaries/$filename"

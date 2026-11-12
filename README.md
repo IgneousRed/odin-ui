@@ -14,10 +14,11 @@ their screens, commands, persistent state, native services and main loop.
 | `odin_ui:input` | Pointer capture, click/drag cancellation, scrolling, focus traversal, DPI-coordinate conversion and safe-area bounds. Caller-owned state; no input polling. |
 | `odin_ui:raylib` | Text measurement/drawing, paragraphs, buttons, fields, progress bars, colors, clipping, scrollbars, trigger hit testing and optional mouse/touch polling. |
 
-The layout frame is parameterized by its content and color types, so a renderer
-can attach typed drawing data to the same nodes without giving the layout engine
-knowledge of fonts, textures or application actions. There is one geometry tree
-for layout, drawing, inspection and hit testing.
+The normal raylib interface has two explicit passes: layout declares and measures
+geometry; paint supplies appearance using that resolved geometry. Hit testing and
+painting share one caller-owned geometry buffer. Painting executes in call order
+without copying the tree or allocating a draw list. The portable layout frame is
+still parameterized by content and color types for existing integrations.
 
 ## Installation
 
@@ -40,90 +41,103 @@ Build normally with `odin build src`. You can instead use
 `odin build src -collection:odin_ui=vendor/odin_ui`. Both forms use the same
 copied sources. The package table above uses collection notation for brevity.
 
-Version `0.1.3` is an early release; the API may change before 1.0. Read the
+Version `0.2.0` is an early release; the API may change before 1.0. Read the
 [changelog](CHANGELOG.md) before updating your copy.
 
 ## Import and ownership
 
-Your host owns its window and frame loop. Inside that loop, using your chosen
-import path and a loaded font:
+Your host owns the window, fonts, frame loop and interaction state:
 
 ```odin
 import ui "../vendor/odin_ui/raylib"
 import rl "vendor:raylib"
 
-screen: ui.UI
-ui.begin(&screen, width, height, {direction = .vertical, gap = 8})
-ui.paragraph(&screen, font, "A paragraph wraps to its resolved width.", 20, rl.WHITE)
-ui.button(&screen, font, "Continue", 20, rl.BLUE, rl.DARKBLUE, {path = "continue"})
-if ui.finish(&screen) == nil {
-    ui.draw(&screen)
-}
+builder: ui.Layout_Builder
+nodes: [128]ui.Layout_Node
+ui.begin_layout(&builder, width, height,
+    {direction = .vertical, gap = 8}, storage = nodes[:])
+label := ui.paragraph_layout(&builder, font, "A paragraph wraps during layout.", 20)
+button := ui.button_layout(&builder, font, "Continue", 20, {path = "continue"})
+resolved, failure := ui.finish_layout(&builder)
+assert(failure == nil)
+hovered := ui.contains_resolved(resolved, button, mouse)
+
+paint: ui.Paint
+ui.begin_paint(&paint, resolved)
+ui.paint_text(&paint, label, {color = rl.WHITE})
+ui.paint_button(&paint, button, {
+    background = rl.BLUE if hovered else rl.DARKBLUE,
+    foreground = rl.WHITE,
+})
+ui.end_paint(&paint)
 ```
 
-`text` is an intrinsically measured, centered label; `paragraph` wraps after width
-resolution. `row`, `column`, `scroll_row`, `scroll_column`, `separator`, `space`,
-`button`, `field` and `bar` use the same frame. Use `begin_clip` for custom drawing;
-pair a successful call with raylib's `EndScissorMode`.
+Keep the builder at the same address after beginning layout. `Node_Handle` and
+`Resolved_Layout` are borrowed, opaque values: do not construct or edit their
+fields. A handle belongs to one builder generation. `begin_layout` invalidates
+all its old handles and resolved views, even when it reuses the same storage.
+`geometry` returns a value snapshot with rectangle, clip, radius, scroll limit,
+trigger and child index; it never returns mutable node access. Builder and node
+fields are implementation storage, not a mutation API. Shared storage may not be
+reused by another live builder. Destroyed builders invalidate all borrowed values.
 
-The raylib text, paragraph, button and field builders copy displayed strings into
-the allocator supplied to `begin`, which defaults to the caller's temporary
-allocator. Prepared paragraph lines use that same allocator. Both `layout.begin`
-and raylib's `begin` accept an explicit `allocator` and optional `storage` slice
-of nodes. A nonempty slice supplies the frame's node capacity and is reused
-without allocating or clearing unused nodes; omitted storage uses
-`UI_NODE_CAPACITY`. For example, pass `storage = nodes[:]` for a caller-owned
-array of `ui.Node`. Reuse it only after input has consumed the old frame.
-Keep displayed strings and prepared lines alive through drawing and the next
-input as well; reclaim them only after input has consumed the old frame. Copy text
-returned by the editing helpers into application-owned storage if it must survive
-the frame.
-The default node limit and the depth limit are configurable through
-`UI_NODE_CAPACITY` (1024) and `UI_DEPTH_CAPACITY` (32), with explicit failures
-instead of partial successful layouts. `failure_node` identifies the node when
-resolution detects invalid geometry, or is `INVALID_INDEX` when no particular
-resolved node is responsible. This library owns no persistent application state;
-application-store, persistence, migration and recovery policies belong to hosts.
+`Geometry` contains sizing, direction, padding, gaps, alignment, scrolling,
+clipping and the hit radius. `row_layout` and `column_layout` open containers;
+`close_layout` closes them. `box_layout`, `text_layout`, `paragraph_layout`,
+`button_layout`, `field_layout`, `bar_layout`, `separator_layout` and
+`space_layout` return handles. `layout_action`, `set_geometry` and
+`measure_layout_width` operate during declaration. Revised geometry must remain
+valid. A successful `finish_layout` returns the resolved view and nil failure;
+repeating it reuses prepared text without measuring again. Failed layouts supply
+no hits or paint operations. Node/depth limits and failure values retain the
+portable layout contracts described below.
 
-`finish` must succeed before `contains`, `hit`, `begin_clip` or drawing can consume
-geometry. Successful finalization sets `resolved`; calling `finish` again reads
-the same result without redoing measurement. Builder calls and `action` after
-success fail with `Unbalanced` and invalidate the frame. Call `begin` to start
-another declaration. Do not directly change node data, geometry, viewport or
-validity fields after finalization. A failed frame supplies no hits and must not
-be presented. Construct a successor privately if a host needs to retain a prior
-presentation after failure; the showcase deliberately asserts on failure.
-Drawing a zero-initialized optional surface remains a no-op.
+Text content, font and pixel size enter layout. Strings are copied into the
+supplied allocator; prepared runes, wrapped lines, line offsets and field cursor
+positions have that same frame/arena lifetime. Fonts remain borrowed host
+resources. Wrapping completes inside `finish_layout`: width resolution is independent of
+intrinsic height, so a second geometry resolution incorporates wrapped heights
+without changing the widths used for preparation. Reclaim the arena only after painting
+and input against the presented frame have finished. Scratch measurement uses
+`context.temp_allocator`; it can be reset separately after layout when prepared
+results use a longer-lived allocator. Reuse a node array and arena to bound memory
+across frames. No geometry allocation is needed when a node slice is supplied.
 
-Wrapping prepares lines once and derives intrinsic height without rewriting
-declared styles. Paragraph height fits by default and can compress in a constrained
-non-scrolling container, consistently with other fit content. Scroll containers
-retain the full measured content extent. Scratch decoding and drawing still use
-`context.temp_allocator`; this may be reset separately when presentation data has
-an explicit longer-lived allocator.
+A paint pass may be empty. Paint operations return false for invalid, stale,
+cross-builder or inappropriate text handles, and after `end_paint`. Fully clipped
+valid commands are successful no-ops. `paint_box`, `paint_text`, `paint_button`,
+`paint_field`, `paint_bar` and `paint_scrollbar` execute immediately in supplied
+order using resolved clips. Each command contains its complete appearance; colors
+have no implicit contrast or disabled-state interpretation. A button draws one
+background. Borders and focus indicators occupy existing bounds. A field accepts
+selection and caret visibility during paint; blinking and recoloring allocate no
+memory and perform no text measurement. Field cursor positions keep long text
+stable while the caret blinks. UTF-8 offsets are clamped to codepoint boundaries.
 
-Each node owns its trigger. The portable `layout` package supplies `action`,
-`node_trigger` and `hit`; the raylib package exposes the same operations with its
-coordinate types. During construction, `action(&screen, index, trigger)` sets or
-replaces it for buttons, fields and custom actionable nodes. `node_trigger` reads
-it and `hit` returns the topmost visible trigger. Trigger paths and payload pointers are borrowed
-and must remain valid until input has consumed the presented frame.
+Paint cannot change rectangles, clips, scroll extents or hit shapes. A change to
+text, font, wrapping, padding, radius or dimensions requires another layout;
+appearance-only changes can reuse the resolved view. The normal API deliberately
+requires even fixed-slot text to be prepared during layout: there is no implicit
+late-content measurement in paint. Fixed-size geometry clips overflowing content
+to the node's resolved bounds. Custom rendering can use the `geometry` snapshot
+and the portable clipping helpers; hosts own renderer effects and their ordering.
 
-Scroll helpers take `(ui, offset, style)`. Identify a scroll container through
-`action(&screen, index, trigger)`, using the same node trigger as other controls.
+Input remains separate from appearance. Query `contains_resolved` or
+`hit_resolved` between the passes, then choose hover, pressed, focused, selected
+and disabled colors. `hit_resolved` searches reverse declaration order. A host
+that paints overlapping nodes in a different order chooses the matching hit order
+with `contains_resolved`. Disabled colors alone do not disable activation. Stable
+trigger identities own persistent capture and focus; frame handles identify only
+the current layout. Trigger paths and payloads are borrowed through presented-frame
+input. Hosts choose surface order, for example main screen, modal backdrop,
+dialog, tooltip. See [the migration guide](MIGRATING.md) for existing integrations.
 
-Fields accept `selection: text.Selection`, the same `{anchor, cursor}` byte offsets
-used by `text.edit`. Pass the returned selection directly to the field options;
-`cursor` separately controls caret visibility. Select all with `{0, len(value)}`
-or the editing helper's `.select_all` operation. Drawing clamps offsets to UTF-8
-codepoint boundaries and places the caret at `selection.cursor`.
-Fields shift their text and selection horizontally when necessary to keep the
-selection's cursor position inside the resolved width, independently of caret
-visibility. Toggling `cursor` to blink the caret leaves that position stable.
-Fields omit their underline when the resolved width leaves no room between the
-text padding.
-Rounded controls cap corner tessellation to bound drawing work for oversized
-geometry, including controls mostly outside the visible clip.
+The compatibility `UI`/`Node`/`Style`, `begin`/`finish`/`draw` and original widget
+builders remain available for external consumers. They retain their original
+combined drawing payloads and allocation behavior; they are not the normal
+two-pass contract. Do not mutate finalized compatibility nodes. Both interfaces
+retain `UI_NODE_CAPACITY` (1024), `UI_DEPTH_CAPACITY` (32), finite geometry checks,
+explicit capacity/unbalanced failures and caller-owned presentation lifetimes.
 
 `hsl` and `hsl_color` wrap hue angles in degrees and expect saturation/lightness
 in `[0, 1]`. `hsl_blend` takes an amount in `[0, 1]`, follows the shorter hue arc
@@ -171,7 +185,7 @@ The Web showcase supplies a frame arena and restores its saved Odin context on
 each callback. This prevents Odin allocations from growing Wasm memory behind
 Emscripten's typed heap views; other hosts must coordinate memory growth or use
 the same arena pattern.
-When drawing with a DPI transform, pass that same scale to `draw`/`begin_clip` so
+When drawing with a DPI transform, pass that same scale to `begin_paint` (or compatibility `draw`/`begin_clip`) so
 framebuffer scissor bounds match the logical geometry. Safe-area insets can be
 supplied as root padding. Native iOS integration is not provided or claimed by
 this extraction; it requires its own raylib host and target validation.
