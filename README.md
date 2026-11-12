@@ -41,9 +41,8 @@ Build normally with `odin build src`. You can instead use
 `odin build src -collection:odin_ui=vendor/odin_ui`. Both forms use the same
 copied sources. The package table above uses collection notation for brevity.
 
-Development version `0.2.1` is not yet published; released archives are listed
-on the [releases page](https://github.com/IgneousRed/odin-ui/releases). The API
-may change before 1.0. Read the [changelog](CHANGELOG.md) before updating your copy.
+Version `0.2.1` is an early release; the API may change before 1.0. Read the
+[changelog](CHANGELOG.md) before updating your copy.
 
 ## Import and ownership
 
@@ -433,20 +432,39 @@ External reviewer selection is recorded in `TODO.md`.
 Repository development builds use `scripts/odin.sh`, which registers this
 checkout's `src/` as the `odin_ui` collection. Consumers do not need this helper.
 
-Before a release, update `VERSION` (version, source and tagged release URL),
-`VENDORING.md` and `CHANGELOG.md`, then run:
+Every new push to `main` must become GitHub's latest public release for that
+exact commit. Advance the version when the current version is already published;
+keep existing tags and release assets unchanged. Update `VERSION` (version,
+source and tagged release URL), `VENDORING.md` and `CHANGELOG.md`, then run:
 
 ```sh
 ./scripts/check.sh
-./scripts/package.sh
 ```
 
-The ZIP in `binaries/` is the same artifact exercised by the consumer check. It
-contains one `odin_ui/` folder ready to copy. Packaging prepares and validates a
-new archive privately before replacing the previous ZIP, and produces
-`binaries/SHA256SUMS.txt`. Tag the checked commit, push it and attach both files
-to the corresponding GitHub release. GitHub also supplies full repository source
-archives; those include the tests and showcase as well.
+The check builds the source-copy ZIP in `binaries/`, verifies its checksum and
+exercises that exact archive in a separate native/Wasm consumer. It contains one
+`odin_ui/` folder ready to copy. Packaging prepares and validates a new archive
+privately before replacing the previous ZIP, and produces
+`binaries/SHA256SUMS.txt`.
+
+Commit the checked changes on `main`, tag that commit and push both. Prepare
+release notes that state local verification and the exact commit's Actions status
+separately. Publish with both artifacts and explicitly select latest; a draft can
+hold the uploads until they are complete:
+
+```sh
+version=$(head -n 1 VERSION)
+gh release create "v$version" "binaries/odin_ui-v$version.zip" \
+    binaries/SHA256SUMS.txt --verify-tag --draft \
+    --title "Odin UI v$version" --notes-file .work/release-notes.md
+gh release edit "v$version" --draft=false --latest
+```
+
+Before considering the main push complete, verify the public latest release, its
+tag's exact commit, and the downloaded assets against their checksum. Deferred
+GitHub Actions setup does not hold publication back; failed, absent or pending CI
+must be reported accurately. GitHub also supplies full repository source archives;
+those include the tests and showcase as well.
 
 ## Shared dependency management
 

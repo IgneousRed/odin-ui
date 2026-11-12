@@ -20,3 +20,10 @@ strict style and warnings as errors, through the documented verification command
 Keep unused-procedure checks scoped to closed application entry points; preserve
 test entry points and external library consumers. Compiler failure must stop
 shared lint. Keep every actual target, define, collection and non-Odin check.
+
+Every new push to `main` must publish a non-draft, non-prerelease GitHub release
+for that exact commit and explicitly make it `latest`, with the verified
+source-copy ZIP and checksum attached. Advance the version when needed; preserve
+existing release tags and assets. A main push is not complete until public latest
+and its tag target are verified. Report local checks and GitHub Actions status
+separately. Deferred Actions setup must not silently hold a release back.

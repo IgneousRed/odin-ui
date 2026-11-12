@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.1 (unreleased)
+## 0.2.1
 
 1. Keep showcase keyboard input inside its focused canvas. Outside HTML controls
    retain normal activation, typing, Backspace and Tab; blur releases held keys
@@ -17,6 +17,8 @@
    cache records as well as corrupt archives.
 6. Upgrade the reviewed GitHub-pinned shared Odin linter to 0.7.1 at commit
    `949293b8a7fcff8f72927b5afb5c5ada8b2df896`; preserve all compiler and lint gates.
+7. Publish each new main commit as the latest public release, keeping local
+   verification and GitHub Actions status explicit.
 
 ## 0.2.0
 

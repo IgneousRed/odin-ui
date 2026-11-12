@@ -379,3 +379,16 @@ No timings were used to infer speed: background workloads make those comparisons
 invalid. GitHub Actions credentials and checked release gating remain explicitly
 deferred in TODO.md. Version 0.2.1 is prepared locally; no new release is claimed
 without remote verification.
+
+
+## 2026-11-12 main/latest publication policy
+
+The user clarified that every new main push must become the latest public
+release. AGENTS.md and the release instructions now require an exact-commit
+release with a verified source-copy archive and checksum, without changing old
+tags/assets. The TODO continues to defer Actions credential repair; it no longer
+makes that setup a publication gate. Local verification and exact-commit CI
+status are reported separately. The prior main CI run failed at its missing
+`ODIN_LINT_GITHUB_TOKEN` prerequisite before compiler or lint execution.
+
+Prepared 0.2.1 release metadata and publication from the final main commit.
