@@ -1,6 +1,6 @@
 # Copy Odin UI into your project
 
-Current release: [v0.2.2](https://github.com/IgneousRed/odin-ui/releases/tag/v0.2.2).
+Current release: [v0.2.3](https://github.com/IgneousRed/odin-ui/releases/tag/v0.2.3).
 
 Choose a published version from the
 [releases page](https://github.com/IgneousRed/odin-ui/releases) and download its

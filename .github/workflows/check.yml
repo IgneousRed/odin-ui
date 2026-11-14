@@ -37,15 +37,7 @@ jobs:
           echo "$PWD/.work/tools/odin" >> "$GITHUB_PATH"
           echo "$PWD/.work/tools/allium" >> "$GITHUB_PATH"
       - name: Check contracts, tests, targets, copied-source consumer, and shared lint
-        env:
-          GH_TOKEN: ${{ secrets.ODIN_LINT_GITHUB_TOKEN }}
-          GH_CONFIG_DIR: ${{ github.workspace }}/.work/gh
         run: |
-          if [ -z "$GH_TOKEN" ]; then
-            echo 'Set ODIN_LINT_GITHUB_TOKEN to a token with read access to IgneousRed/odin-lint.' >&2
-            exit 2
-          fi
-          gh auth setup-git --hostname github.com
           odin version
           allium --version
           ./scripts/check.sh

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.3
+
+1. Fetch the now-public pinned Odin linter in GitHub Actions without a separate
+   token. Remove the obsolete missing-secret guard and authentication setup.
+2. Update public linter setup instructions and release metadata. Library source,
+   public APIs and runtime behavior are unchanged from 0.2.2.
+
 ## 0.2.2
 
 1. Consolidate project agent instructions and retain the documented compiler

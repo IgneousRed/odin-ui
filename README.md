@@ -41,7 +41,7 @@ Build normally with `odin build src`. You can instead use
 `odin build src -collection:odin_ui=vendor/odin_ui`. Both forms use the same
 copied sources. The package table above uses collection notation for brevity.
 
-Version `0.2.2` is an early release; the API may change before 1.0. Read the
+Version `0.2.3` is an early release; the API may change before 1.0. Read the
 [changelog](CHANGELOG.md) before updating your copy.
 
 ## Import and ownership
@@ -199,7 +199,7 @@ The development check toolchain is:
 | Tool | Tested version | Source |
 | --- | --- | --- |
 | Odin | `dev-2026-11a`, compiler `9a6991685` (also printed as `9a69916`) | [November release](https://github.com/odin-lang/Odin/releases/tag/dev-2026-11a), [installation guide](https://odin-lang.org/docs/install/) |
-| Shared Odin linter runner | Python 3.9+ standard library, Git, authenticated GitHub access | [Pinned integration contract](https://github.com/IgneousRed/odin-lint/blob/949293b8a7fcff8f72927b5afb5c5ada8b2df896/docs/integration.md) |
+| Shared Odin linter runner | Python 3.9+ standard library, Git, public GitHub access | [Pinned integration contract](https://github.com/IgneousRed/odin-lint/blob/949293b8a7fcff8f72927b5afb5c5ada8b2df896/docs/integration.md) |
 | Allium CLI | `3.6.1`, including language version 3 | [Release binaries](https://github.com/juxt/allium-tools/releases/tag/v3.6.1), [installation guide](https://github.com/juxt/allium-tools#install-the-cli) |
 | Desktop raylib | `6.2` on macOS ARM64 | Linked through Odin's `vendor:raylib` collection; the tested Homebrew Odin package supplies bindings and links Homebrew raylib |
 | Node.js | 18+ standard library; no npm packages | Host regression checks and optional Chromium smoke runner |
@@ -273,20 +273,15 @@ the required Odin compiler. No sibling linter checkout, home-directory skill,
 OLS installation or Python package is a runtime dependency. Its only cache and
 temporary source builds live in ignored `.work/odin-lint/`.
 
-For this private repository, authenticate GitHub CLI with an account that can
-read the linter repository and configure Git's credential helper:
+The linter repository is public. No GitHub login or Actions secret is required
+to fetch the pinned revision:
 
 ```sh
-gh auth login --hostname github.com
-gh auth setup-git --hostname github.com
 ./scripts/check.sh
 ```
 
-CI uses the same check script. Configure the Actions secret
-`ODIN_LINT_GITHUB_TOKEN` with read access to `IgneousRed/odin-lint`; the consuming
-repository's default `GITHUB_TOKEN` does not normally grant that access. The job
-configures Git via `gh auth setup-git` and fails if the secret is missing. Never
-store credentials in the lock file or repository.
+CI uses the same check script and fetches the public linter through HTTPS Git
+without a separate token. Never store credentials in the lock file or repository.
 
 The check script runs library `-no-entry-point` checks and package tests, native
 and Wasm showcase checks (including `RAYLIB_WASM_LIB=env.o`), portable Wasm library
