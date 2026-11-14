@@ -1,29 +1,5 @@
 # Odin UI
 
-Before editing code, read the installed `coding` skill.
-Keep layout, text and interaction independent of raylib, operating systems and application state.
-Keep rendering and platform effects in adapters; use caller-owned state.
-See `README.md` for the API, ownership and build contracts.
-After editing code, run `./scripts/check.sh` before completing the change. It must
-pass the applicable Odin compiler checks before running every rule of the
-GitHub-pinned shared Odin linter. Setup or analysis failure is not a pass.
-Keep the runner and root `odin-lint.lock.json` pinned to the same reviewed GitHub
-commit; follow the explicit upgrade process in `README.md`.
-Public APIs may have consumers outside this repository. Do not narrow their
-visibility or move them out of interfaces solely from repository-local lint evidence.
-This library owns no persistent application state or application sessions; example state is disposable.
-Exclude the coding skill's application-store, persistence, state-preservation, migration and recovery requirements.
-Caller-owned interaction state and frame-local working data still follow the documented ownership and lifetime contracts.
+Before editing code, read the installed `coding` skill. Keep layout, text and interaction independent of raylib, operating systems and application state. Keep rendering and platform effects in adapters; use caller-owned state. See `README.md` for the API, ownership and build contracts. After editing code, run `./scripts/check.sh` before completing the change. It must pass the applicable Odin compiler checks before running every rule of the GitHub-pinned shared Odin linter. Setup or analysis failure is not a pass. Keep the runner and root `odin-lint.lock.json` pinned to the same reviewed GitHub commit; follow the explicit upgrade process in `README.md`. Public APIs may have consumers outside this repository. Do not narrow their visibility or move them out of interfaces solely from repository-local lint evidence. This library owns no persistent application state or application sessions; example state is disposable. Exclude the coding skill's application-store, persistence, state-preservation, migration and recovery requirements. Caller-owned interaction state and frame-local working data still follow the documented ownership and lifetime contracts.
 
-Use maximal compatible Odin compiler vetting on first-party packages, with
-strict style and warnings as errors, through the documented verification command.
-Keep unused-procedure checks scoped to closed application entry points; preserve
-test entry points and external library consumers. Compiler failure must stop
-shared lint. Keep every actual target, define, collection and non-Odin check.
-
-Every new push to `main` must publish a non-draft, non-prerelease GitHub release
-for that exact commit and explicitly make it `latest`, with the verified
-source-copy ZIP and checksum attached. Advance the version when needed; preserve
-existing release tags and assets. A main push is not complete until public latest
-and its tag target are verified. Report local checks and GitHub Actions status
-separately. Deferred Actions setup must not silently hold a release back.
+Every new push to `main` must publish a non-draft, non-prerelease GitHub release for that exact commit and explicitly make it `latest`, with the verified source-copy ZIP and checksum attached. Advance the version when needed; preserve existing release tags and assets. A main push is not complete until public latest and its tag target are verified. Report local checks and GitHub Actions status separately. Deferred Actions setup must not silently hold a release back.
