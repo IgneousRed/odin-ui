@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.2
+
+1. Consolidate project agent instructions and retain the documented compiler
+   vetting and release requirements.
+2. Refresh release metadata and the source-copy package for discovery by consumers.
+   Library source, public APIs and runtime behavior are unchanged from 0.2.1.
+
 ## 0.2.1
 
 1. Keep showcase keyboard input inside its focused canvas. Outside HTML controls
