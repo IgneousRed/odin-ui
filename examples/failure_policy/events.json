@@ -1,0 +1,8 @@
+[
+  {"revision":0,"width":320,"fail":false},
+  {"revision":0,"width":320,"fail":true},
+  {"revision":1,"width":320,"fail":true},
+  {"revision":1,"width":320,"fail":false},
+  {"revision":1,"width":0,"fail":true},
+  {"revision":1,"width":640,"fail":false}
+]

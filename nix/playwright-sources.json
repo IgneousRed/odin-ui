@@ -1,0 +1,31 @@
+{
+  "version": "1.65.0",
+  "chromiumRevision": "1254",
+  "chromiumVersion": "158.0.8127.18",
+  "webkitRevision": "2388",
+  "webkitDarwinRelease": "26",
+  "npm": {
+    "playwright": {
+      "url": "https://registry.npmjs.org/playwright/-/playwright-1.65.0.tgz",
+      "hash": "sha512-F3AMWcR44qMBt4kq+6Kb6mX7bjGXshktKFOPULd7reED6ZJWevjbNRqysP7q+AATE9kdPEZBibex1BYsvpVoeA=="
+    },
+    "core": {
+      "url": "https://registry.npmjs.org/playwright-core/-/playwright-core-1.65.0.tgz",
+      "hash": "sha512-vNSKgH6YqtN7cdT/L334zo0a+YwkrpicyrHJlWWPIm/Q+Nn2SWInil01oT0mbu96U4GgoRtCYQD9CzJQgju+lA=="
+    }
+  },
+  "archives": {
+    "chromium": {
+      "url": "https://cdn.playwright.dev/builds/cft/158.0.8127.18/mac-arm64/chrome-mac-arm64.zip",
+      "hash": "sha256-FdVHg9QHMpg2U+vCFxrzjGtbWrBVqa+/SNR8K1eDbak="
+    },
+    "headless": {
+      "url": "https://cdn.playwright.dev/builds/cft/158.0.8127.18/mac-arm64/chrome-headless-shell-mac-arm64.zip",
+      "hash": "sha256-80Jh0qrZT7cbM2WXrKvyAWbuWi8UkmxzHzPQTF2mzT8="
+    },
+    "webkit": {
+      "url": "https://cdn.playwright.dev/dbazure/download/playwright/builds/webkit/2388/webkit-mac-26-arm64.zip",
+      "hash": "sha256-08xzACcQWgFNDL9TklvX6rq73428y7SjoXE8X2MdvK8="
+    }
+  }
+}

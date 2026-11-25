@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+project=$(git rev-parse --show-toplevel)
+"$project/scripts/dev" python3 -I "$project/tools/check_publication.py" --index
+exec "$project/scripts/check-deps"

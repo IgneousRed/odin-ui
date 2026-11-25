@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+project=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd -P)
+if [ "${PROJECT_ROOT:-}" != "$project" ] || [ -z "${PROJECT_NIX_ENVIRONMENT:-}" ]; then
+    exec "$project/scripts/dev" "$project/scripts/precommit" "$@"
+fi
+python3 -I "$project/tools/check_publication.py" --index
+"$project/scripts/check-deps"
+exec "$project/scripts/check.sh" "$@"

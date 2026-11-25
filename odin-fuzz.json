@@ -1,0 +1,60 @@
+{
+  "collections": {
+    "odin_ui": "src"
+  },
+  "odin_flags": [
+    "-define:UI_REPLAY=true",
+    "-define:RAYLIB_SHARED=true"
+  ],
+  "linker_flags": [
+    "-lraylib.620",
+    "-framework",
+    "Cocoa",
+    "-framework",
+    "OpenGL",
+    "-framework",
+    "IOKit",
+    "-framework",
+    "QuartzCore"
+  ],
+  "applications": [
+    {
+      "path": "examples/showcase",
+      "name": "showcase-replay",
+      "files": [
+        "examples/showcase/host-events.json"
+      ],
+      "ui_events": {
+        "mode": "file",
+        "path": "examples/showcase/events.json",
+        "format": "json",
+        "keys": [
+          "TAB",
+          "ENTER",
+          "SPACE",
+          "A",
+          "BACKSPACE",
+          "DELETE",
+          "LEFT",
+          "RIGHT",
+          "HOME",
+          "END",
+          "LEFT_SHIFT",
+          "LEFT_CONTROL",
+          "RIGHT_SHIFT",
+          "RIGHT_CONTROL",
+          "LEFT_SUPER",
+          "RIGHT_SUPER"
+        ],
+        "max_frames": 64
+      }
+    },
+    {
+      "path": "examples/failure_policy",
+      "name": "failure-policy-replay",
+      "files": [
+        "examples/failure_policy/events.json"
+      ]
+    }
+  ]
+}

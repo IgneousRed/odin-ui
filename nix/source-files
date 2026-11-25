@@ -1,0 +1,8 @@
+# Explicit immutable inputs for the environment and source-package output.
+src
+LICENSE
+VERSION
+VENDORING.md
+MIGRATING.md
+odin-lint.lock.json
+odin-fuzz.lock.json
