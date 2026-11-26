@@ -32,12 +32,19 @@ llvmPackages.stdenv.mkDerivation {
 
   buildPhase = ''
     runHook preBuild
-    odin build src -debug -thread-count:2 \
-      -vet -vet-tabs -vet-using-param -vet-nil-deref -vet-uninitialized \
-      -vet-atomic-access -strict-style -warnings-as-errors -vet-unused-procedures \
-      -vet-packages:src,effects,functions,state \
-      -strict-style-packages:src,effects,functions,state \
-      -out:odin-fuzz-scan
+    if ! [[ "''${NIX_BUILD_CORES:-}" =~ ^[1-9][0-9]*$ ]]; then
+      echo "NIX_BUILD_CORES must be a normalized positive integer" >&2
+      exit 1
+    fi
+    (
+      set -x
+      odin build src -debug "-thread-count:$NIX_BUILD_CORES" \
+        -vet -vet-tabs -vet-using-param -vet-nil-deref -vet-uninitialized \
+        -vet-atomic-access -strict-style -warnings-as-errors -vet-unused-procedures \
+        -vet-packages:src,effects,functions,state \
+        -strict-style-packages:src,effects,functions,state \
+        -out:odin-fuzz-scan
+    )
     runHook postBuild
   '';
 
