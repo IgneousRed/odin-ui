@@ -89,21 +89,27 @@ a valid caller: storage/handle lifetimes and valid UTF-8 remain API contracts.
 
 ## Findings and upgrades
 
-Only **Gemini 4 Neon** (`antigravity` / `gemini-4-neon`) may read upstream
-README/docs, run `reproduce`, or inspect detailed `report.md`, `report.json` and
-`findings/` bundles. Other models read only the guide, run `doctor`/`scan`/`explore`
-and inspect `summary.json`. On exit 1, a positive finding count, or any need for
-detailed gap/failure triage, stop and delegate to that exact model. Its response
-must contain only files changed, high-level fixes, verification counts and
-remaining owner items; no payloads, crash traces or low-level security details.
-Keep the run intact for that work. Confirmed fixes should become meaningful
-portable regressions and rerun affected checks plus exploration.
+Ordinary setup, documentation, coverage verification and infrastructure maintenance
+may be handled by the current model; these tasks do not require delegation.
+Only actual fuzzer findings and their triage, reproduction or remediation require
+**Gemini 4 Neon** (`antigravity` / `gemini-4-neon`), including access to detailed
+actual-finding reports and bundles. Other models may inspect safe `summary.json`
+setup/coverage metadata. A positive `finding_count` requires stopping before opening
+finding details and handing the actual finding to Neon. Infrastructure or coverage
+failures without actual findings remain with the current model.
 
-For upgrades, select a full published commit, read only its `GUIDE.md`, update
-source declaration and lock/archive checksum together, and take the canonical
-package recipe from the integration owner. Verify checks, `doctor`,
-discovery and real coverage feedback on each configured replay. Do not depend on
-unpublished behavior or inspect the implementation.
+A finding handoff returns only files changed, high-level fixes, verification counts
+and remaining owner items; no payloads, crash traces, memory-corruption details or
+low-level security names. Preserve the run opaquely for that work. Confirmed fixes
+should become meaningful portable regressions and rerun affected checks plus exploration.
+
+For upgrades, select a full published commit, review its published guide and
+integration contract, update the source declaration and lock/archive checksum
+together, and take the canonical package recipe from the integration owner. Verify
+checks, `doctor`, discovery and real coverage feedback on each configured replay.
+Do not depend on unpublished behavior or inspect actual-finding payloads outside
+the finding workflow.
+
 For the intermittent Odin parser issue, pass
 `-thread-count:1` from the first compiler check with all existing flags; do not use a rewriting wrapper or
 change compiler policy. `scripts/check.sh -thread-count:1` forwards that explicit

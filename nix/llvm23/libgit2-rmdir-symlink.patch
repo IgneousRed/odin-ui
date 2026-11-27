@@ -56,7 +56,7 @@ License: libgit2 GPLv2 with linking exception; see the fetched source's COPYING.
 +	struct stat st;
 +
 +	cl_git_pass(git_str_joinpath(&link, empty_tmp_dir, "one/two_one/link"));
-+	cl_git_pass(git_str_joinpath(&missing, link.ptr, "missing"));
++	cl_git_pass(git_str_sets(&missing, "one/two_one/link/missing"));
 +	cl_git_pass(git_str_joinpath(&target, empty_tmp_dir, "one/retained.txt"));
 +	cl_git_mkfile(target.ptr, "retained target");
 +	cl_must_pass(p_symlink("..", link.ptr));

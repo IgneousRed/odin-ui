@@ -41,7 +41,7 @@ Build normally with `odin build src`. You can instead use
 `odin build src -collection:odin_ui=vendor/odin_ui`. Both forms use the same
 copied sources. The package table above uses collection notation for brevity.
 
-Version `0.2.11` is an early release; the API may change before 1.0. Read the
+Version `0.2.12` is an early release; the API may change before 1.0. Read the
 [changelog](CHANGELOG.md) before updating your copy.
 
 ## Import and ownership
@@ -225,7 +225,7 @@ copies ignored working data into the store.
 | --- | --- | --- |
 | nixpkgs | `619c39f6eac5d1ed6b8f073a9414baf7034b2356` | `flake.lock` |
 | Odin | `dev-2026-11a`, exact source `9a6991685ddf663956d9836602eb421e141fc443`; Darwin LLVM 23.1.6 | `nix/llvm23/`, Linux `nix/toolchain.nix` |
-| Shared Odin linter | `0.7.7`, `8643e84c9d56ed02ff3cfd75a3aad717447ae9d7` | `odin-lint.lock.json`, `nix/odin-lint-source.nix` |
+| Shared Odin linter | `0.7.7`, `6cca8868fa34b8ddd291e358ae640571a60c80e4` | `odin-lint.lock.json`, `nix/odin-lint-source.nix` |
 | Allium CLI | `3.7.2`, language version 3 | `nix/allium.nix` |
 | Native and web raylib | `6.2`, static web OpenGL ES 2 | Darwin `nix/llvm23/`, Linux `nix/toolchain.nix`, `nix/web-raylib.nix` |
 | Emscripten | `7.0.1`, matching upstream LLVM 24 and Binaryen | `nix/emscripten-sources.json` |
@@ -285,7 +285,7 @@ seeds run in the normal suite; consumers need no fuzz tool.
 [`odin-lint.lock.json`](odin-lint.lock.json) and
 [`nix/odin-lint-source.nix`](nix/odin-lint-source.nix) pin the public
 [`IgneousRed/odin-lint`](https://github.com/IgneousRed/odin-lint) source at
-`8643e84c9d56ed02ff3cfd75a3aad717447ae9d7` (`0.7.7`). The canonical
+`6cca8868fa34b8ddd291e358ae640571a60c80e4` (`0.7.7`). The canonical
 [`nix/odin-lint.nix`](nix/odin-lint.nix) builds it with the locked compiler and
 stamps that revision into the executable. Update metadata follows published
 `main` revisions; the fixed `v0.7.7` tag does not move with later compatible
@@ -310,7 +310,7 @@ check; do not treat them as a clean result.
 
 Public APIs can have consumers outside this checkout. Repository-local lint
 alone cannot justify narrowing visibility or interfaces. See the
-[pinned rules and analysis limits](https://github.com/IgneousRed/odin-lint/blob/8643e84c9d56ed02ff3cfd75a3aad717447ae9d7/docs/rules.md).
+[pinned rules and analysis limits](https://github.com/IgneousRed/odin-lint/blob/6cca8868fa34b8ddd291e358ae640571a60c80e4/docs/rules.md).
 
 To upgrade deliberately:
 

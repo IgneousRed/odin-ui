@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.12
+
+1. Synchronize the canonical libgit2 regression fixture and shared native checksum
+   manifest, preserving its production fragment, assertions, providers and versions.
+2. Pin Odin linter source revision
+   `6cca8868fa34b8ddd291e358ae640571a60c80e4` with the matching canonical package.
+3. Clarify that Neon is required for actual fuzzer findings and their reproduction
+   or remediation, not ordinary setup, documentation or infrastructure maintenance.
+4. Library sources, public APIs and runtime behavior are unchanged.
+
 ## 0.2.11
 
 1. Adopt the published shared native dependency unit and Odin linter revision

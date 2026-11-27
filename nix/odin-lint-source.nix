@@ -3,8 +3,8 @@ let
   owner = "IgneousRed";
   repo = "odin-lint";
   version = "0.7.7";
-  rev = "8643e84c9d56ed02ff3cfd75a3aad717447ae9d7";
-  hash = "sha256-Z59eOhN903T4TbZ5703gH7svufjbdT7jY9WD2XD0OYc=";
+  rev = "6cca8868fa34b8ddd291e358ae640571a60c80e4";
+  hash = "sha256-dkWpSLZFDXKOEcpzyBLoM8RLJNNkzILF0tPwJRvVzEA=";
 in
 {
   inherit owner repo version rev hash;
