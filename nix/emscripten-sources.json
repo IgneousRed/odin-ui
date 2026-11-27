@@ -1,29 +1,29 @@
 {
-  "version": "7.0.0",
-  "release": "6afbd83493d647051772d491124187d4e9a0cda9",
-  "llvmRevision": "84ba7b37f02df5a5567e31a1bcfa0f607e578f12",
-  "binaryenRevision": "a9141c8ccdd082009c61970e715c02a8652a3f6f",
+  "version": "7.0.1",
+  "release": "9146b21a8350e85c9934cf570f7a6ceb7470623b",
+  "llvmRevision": "d361f7b3f5946f69f9e9e54fb28feac5da45d7d0",
+  "binaryenRevision": "e7a4b90f3c638d57dc5a9bf5b49a9a0342278af4",
   "archives": {
     "aarch64-darwin": {
-      "url": "https://storage.googleapis.com/webassembly/emscripten-releases-builds/mac/6afbd83493d647051772d491124187d4e9a0cda9/wasm-binaries-arm64.tar.xz",
-      "hash": "sha256-aRLvUk/BFzwrYM1FSwSi50FgwJ33PK6278Y8Ei/4jFc="
+      "url": "https://storage.googleapis.com/webassembly/emscripten-releases-builds/mac/9146b21a8350e85c9934cf570f7a6ceb7470623b/wasm-binaries-arm64.tar.xz",
+      "hash": "sha256-vQC0v7ML8CXOnT3ymdkhaj9ua1S6b/scFADpFrO46i0="
     },
     "x86_64-linux": {
-      "url": "https://storage.googleapis.com/webassembly/emscripten-releases-builds/linux/6afbd83493d647051772d491124187d4e9a0cda9/wasm-binaries.tar.xz",
-      "hash": "sha256-bnxtJs+L3jHmz2o3fBE/kTyy0w9MLWccEELhxLzRZJU="
+      "url": "https://storage.googleapis.com/webassembly/emscripten-releases-builds/linux/9146b21a8350e85c9934cf570f7a6ceb7470623b/wasm-binaries.tar.xz",
+      "hash": "sha256-rrqy/6m3WNVtueQa36ywvwD5WACXDGT15qCudjEGa1w="
     },
     "aarch64-linux": {
-      "url": "https://storage.googleapis.com/webassembly/emscripten-releases-builds/linux/6afbd83493d647051772d491124187d4e9a0cda9/wasm-binaries-arm64.tar.xz",
-      "hash": "sha256-2wdLuikq3MWHOv7jEPI2X85YCpeK5vBfjacLRdJWiuM="
+      "url": "https://storage.googleapis.com/webassembly/emscripten-releases-builds/linux/9146b21a8350e85c9934cf570f7a6ceb7470623b/wasm-binaries-arm64.tar.xz",
+      "hash": "sha256-c2Pw8lFlUPg9BQvvy45y8y7fcaXY4g9k8JECSBNDhB0="
     }
   },
   "licenses": {
     "llvm": {
-      "url": "https://raw.githubusercontent.com/llvm/llvm-project/84ba7b37f02df5a5567e31a1bcfa0f607e578f12/llvm/LICENSE.TXT",
+      "url": "https://raw.githubusercontent.com/llvm/llvm-project/d361f7b3f5946f69f9e9e54fb28feac5da45d7d0/llvm/LICENSE.TXT",
       "hash": "sha256-jYXBBX10Lll5hcfU5jILAVqROThc/0y64G/8Dr6Jr+4="
     },
     "binaryen": {
-      "url": "https://raw.githubusercontent.com/WebAssembly/binaryen/a9141c8ccdd082009c61970e715c02a8652a3f6f/LICENSE",
+      "url": "https://raw.githubusercontent.com/WebAssembly/binaryen/e7a4b90f3c638d57dc5a9bf5b49a9a0342278af4/LICENSE",
       "hash": "sha256-ZMDQJJHhbs7XSCZEDs0rz3ci03+lhvr0V7JJQpOvv/4="
     }
   }

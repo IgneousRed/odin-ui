@@ -1,27 +1,27 @@
 {
-  "version": "1.65.0",
-  "chromiumRevision": "1254",
-  "chromiumVersion": "158.0.8127.18",
+  "version": "1.65.1",
+  "chromiumRevision": "1255",
+  "chromiumVersion": "159.0.8154.6",
   "webkitRevision": "2388",
   "webkitDarwinRelease": "26",
   "npm": {
     "playwright": {
-      "url": "https://registry.npmjs.org/playwright/-/playwright-1.65.0.tgz",
-      "hash": "sha512-F3AMWcR44qMBt4kq+6Kb6mX7bjGXshktKFOPULd7reED6ZJWevjbNRqysP7q+AATE9kdPEZBibex1BYsvpVoeA=="
+      "url": "https://registry.npmjs.org/playwright/-/playwright-1.65.1.tgz",
+      "hash": "sha512-vJ1FuoOrNwOKHUIVEvSt3jT1L+wjjDpwhwIstKtfvTh8XIG4FG4bIFuvNdMxi81LGfAhUgUZleVFaOLY4RIUUw=="
     },
     "core": {
-      "url": "https://registry.npmjs.org/playwright-core/-/playwright-core-1.65.0.tgz",
-      "hash": "sha512-vNSKgH6YqtN7cdT/L334zo0a+YwkrpicyrHJlWWPIm/Q+Nn2SWInil01oT0mbu96U4GgoRtCYQD9CzJQgju+lA=="
+      "url": "https://registry.npmjs.org/playwright-core/-/playwright-core-1.65.1.tgz",
+      "hash": "sha512-hqPpz7blSMPxWVdoeE1yiBSzXsKiVOd2k+kjCvmUywD2GPO2Dd9HfcWnq9NN0GHbNZDFgZ9JfBFr+X5/BLo0qw=="
     }
   },
   "archives": {
     "chromium": {
-      "url": "https://cdn.playwright.dev/builds/cft/158.0.8127.18/mac-arm64/chrome-mac-arm64.zip",
-      "hash": "sha256-FdVHg9QHMpg2U+vCFxrzjGtbWrBVqa+/SNR8K1eDbak="
+      "url": "https://cdn.playwright.dev/builds/cft/159.0.8154.6/mac-arm64/chrome-mac-arm64.zip",
+      "hash": "sha256-Q2CWdqQeKdHHZnk165FKQi7KmLLkncv9bz6XlCAt4So="
     },
     "headless": {
-      "url": "https://cdn.playwright.dev/builds/cft/158.0.8127.18/mac-arm64/chrome-headless-shell-mac-arm64.zip",
-      "hash": "sha256-80Jh0qrZT7cbM2WXrKvyAWbuWi8UkmxzHzPQTF2mzT8="
+      "url": "https://cdn.playwright.dev/builds/cft/159.0.8154.6/mac-arm64/chrome-headless-shell-mac-arm64.zip",
+      "hash": "sha256-sI576vAqGeLuXtaVX5w4U6uRds1btXuoevu4Lp+BzCk="
     },
     "webkit": {
       "url": "https://cdn.playwright.dev/dbazure/download/playwright/builds/webkit/2388/webkit-mac-26-arm64.zip",

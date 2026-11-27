@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.11
+
+1. Adopt the published shared native dependency unit and Odin linter revision
+   `8643e84c9d56ed02ff3cfd75a3aad717447ae9d7`. Preserve compiler, SDK and ABI
+   boundaries and reuse the existing shared Node 26.13.1 output.
+2. Update the coupled Emscripten SDK to 7.0.1 and Playwright to 1.65.1 with its
+   matching Chromium bundles; retain the shipped WebKit and FFmpeg revisions.
+3. Keep dependency reports complete after truncated HTTP responses, reject
+   symlinked parent components before staging declared Nix inputs while retaining
+   intentional project-root aliases and regular nested paths with spaces, and
+   honor `NIX_BUILD_CORES` in the `odin-fuzz` Nix build recipe.
+4. Library sources, public APIs and runtime behavior are unchanged.
+
 ## 0.2.10
 
 1. Publish a fresh source snapshot without previous Git ancestry or release tags.

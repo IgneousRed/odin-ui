@@ -57,7 +57,7 @@ stdenv.mkDerivation {
         -vet-atomic-access -strict-style -warnings-as-errors \
         -vet-unused-procedures -vet-packages:src,effects,state
     )
-    odin build src -debug -o:speed -thread-count:2 \
+    odin build src -debug -o:speed "-thread-count:$NIX_BUILD_CORES" \
       -define:ODIN_LINT_REVISION=${revision} -out:odin-lint
     runHook postBuild
   '';

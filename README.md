@@ -41,7 +41,7 @@ Build normally with `odin build src`. You can instead use
 `odin build src -collection:odin_ui=vendor/odin_ui`. Both forms use the same
 copied sources. The package table above uses collection notation for brevity.
 
-Version `0.2.10` is an early release; the API may change before 1.0. Read the
+Version `0.2.11` is an early release; the API may change before 1.0. Read the
 [changelog](CHANGELOG.md) before updating your copy.
 
 ## Import and ownership
@@ -225,12 +225,12 @@ copies ignored working data into the store.
 | --- | --- | --- |
 | nixpkgs | `619c39f6eac5d1ed6b8f073a9414baf7034b2356` | `flake.lock` |
 | Odin | `dev-2026-11a`, exact source `9a6991685ddf663956d9836602eb421e141fc443`; Darwin LLVM 23.1.6 | `nix/llvm23/`, Linux `nix/toolchain.nix` |
-| Shared Odin linter | `0.7.7`, `7f6d541b086bde8ab866a93dec024e11d8288fed` | `odin-lint.lock.json`, `nix/odin-lint-source.nix` |
+| Shared Odin linter | `0.7.7`, `8643e84c9d56ed02ff3cfd75a3aad717447ae9d7` | `odin-lint.lock.json`, `nix/odin-lint-source.nix` |
 | Allium CLI | `3.7.2`, language version 3 | `nix/allium.nix` |
 | Native and web raylib | `6.2`, static web OpenGL ES 2 | Darwin `nix/llvm23/`, Linux `nix/toolchain.nix`, `nix/web-raylib.nix` |
-| Emscripten | `7.0.0`, matching upstream LLVM 24 and Binaryen | `nix/emscripten-sources.json` |
+| Emscripten | `7.0.1`, matching upstream LLVM 24 and Binaryen | `nix/emscripten-sources.json` |
 | Node.js / Python | Node 26.13.1; Darwin Python 3.15.2 rebuilt with LLVM 23.1.6 | `flake.nix`, `nix/llvm23/` and `flake.lock` |
-| Darwin browser tools | Playwright `1.65.0`, matching Chromium and native WebKit | `nix/playwright-sources.json` |
+| Darwin browser tools | Playwright `1.65.1`, matching Chromium and native WebKit | `nix/playwright-sources.json` |
 
 The Odin and Emscripten LLVM versions serve different compilers: Darwin LLVM 23
 matches Odin's backend and native toolchain; Linux retains LLVM 22. LLVM 24 belongs
@@ -242,10 +242,9 @@ Run the complete check suite locally with `./scripts/check.sh`. The default
 suite type-checks Wasm and runs headless native tests; `./scripts/check-web.sh`
 separately links and runs the browser showcase. The locked Nix environment
 passed the full local suite and linked Chromium regression check on macOS ARM64
-with Emscripten 7.0.0 and raylib 6.2. Native WebKit startup also passed. Checkout
-and source-archive bootstrap select the same immutable environment from the
-locked tools and declared inputs. No private records are required
-for setup or verification.
+with Emscripten 7.0.1 and raylib 6.2. Native WebKit startup also passed. Checkout
+and source-archive setup use the same declared-input allowlist and pinned tool
+definitions. No private records are required for setup or verification.
 Library consumers can copy plain sources using [VENDORING.md](VENDORING.md);
 Nix is a developer prerequisite for this repository, not a library runtime.
 
@@ -286,10 +285,11 @@ seeds run in the normal suite; consumers need no fuzz tool.
 [`odin-lint.lock.json`](odin-lint.lock.json) and
 [`nix/odin-lint-source.nix`](nix/odin-lint-source.nix) pin the public
 [`IgneousRed/odin-lint`](https://github.com/IgneousRed/odin-lint) source at
-`7f6d541b086bde8ab866a93dec024e11d8288fed` (`0.7.7`). The canonical
+`8643e84c9d56ed02ff3cfd75a3aad717447ae9d7` (`0.7.7`). The canonical
 [`nix/odin-lint.nix`](nix/odin-lint.nix) builds it with the locked compiler and
-stamps that revision into the executable. Environment evaluation rejects a
-mismatched source/lock pair. No Python/Git runner, mutable linter cache, GitHub
+stamps that revision into the executable. Update metadata follows published
+`main` revisions; the fixed `v0.7.7` tag does not move with later compatible
+commits. Environment evaluation rejects a mismatched source/lock pair. No Python/Git runner, mutable linter cache, GitHub
 login or token is needed at runtime.
 
 The check script runs library checks and package tests, native and Wasm showcase
@@ -310,7 +310,7 @@ check; do not treat them as a clean result.
 
 Public APIs can have consumers outside this checkout. Repository-local lint
 alone cannot justify narrowing visibility or interfaces. See the
-[pinned rules and analysis limits](https://github.com/IgneousRed/odin-lint/blob/7f6d541b086bde8ab866a93dec024e11d8288fed/docs/rules.md).
+[pinned rules and analysis limits](https://github.com/IgneousRed/odin-lint/blob/8643e84c9d56ed02ff3cfd75a3aad717447ae9d7/docs/rules.md).
 
 To upgrade deliberately:
 
@@ -450,8 +450,11 @@ setup and documentation are self-contained; local instructions are not inputs.
 ## Shared dependency management
 
 `flake.lock` and the fixed recipes in `nix/` select tools. Darwin's canonical
-Git shares the rebuilt Python; its preserved Perl support-file exception is
-recorded in [the bundle notes](nix/llvm23/README.md#perl-support-file-exception).
+Git 2.56.1 shares the rebuilt Python and selected Perl 5.44.0 module scope; native
+library choices and compatibility holds are recorded in
+[the bundle notes](nix/llvm23/README.md#shared-dependency-selection).
+Node 26.13.1 keeps the existing shared catalog output, rather than realizing the
+native bundle's optional Node override merely to converge support libraries.
 Update locks only as an explicit reviewed change. After cloning, enable the dependency-check hook
 with `git config core.hooksPath .githooks`. Source archives can run the check
 commands directly. Before **every commit**, run:

@@ -23,7 +23,7 @@ let
   chromium = bundle "chromium" sources.archives.chromium;
   headless = bundle "chromium-headless-shell" sources.archives.headless;
   webkit = bundle "webkit-macos-${sources.webkitDarwinRelease}" sources.archives.webkit;
-  # This unchanged ffmpeg revision is also used by Playwright 1.65.0.
+  # Upstream Playwright 1.65.1 retains this ffmpeg revision (1013).
   ffmpeg = playwright-driver.components.ffmpeg;
   browsers = linkFarm "playwright-${sources.version}-browsers" [
     { name = "chromium-${sources.chromiumRevision}"; path = chromium; }

@@ -78,7 +78,7 @@
           updates = [
             { name = "nixpkgs"; current = nixpkgs.rev; kind = "github-revision"; repository = "NixOS/nixpkgs"; ref = "nixpkgs-unstable"; }
             { name = "Odin"; current = odin.version; kind = "github-release"; repository = "odin-lang/Odin"; }
-            { name = "odin-lint"; current = lintSource.rev; kind = "github-release"; repository = "IgneousRed/odin-lint"; }
+            { name = "odin-lint"; current = lintSource.rev; kind = "github-revision"; repository = "IgneousRed/odin-lint"; ref = "main"; }
             allium.dependencyUpdate
             { name = "nodejs"; kind = "nodejs"; current = nodejs.version; }
             { name = "Emscripten"; current = sdkSource.version; kind = "json-version";

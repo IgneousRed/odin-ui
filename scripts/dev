@@ -68,6 +68,17 @@ stage() {
         *//*|*/../*|*/./*|*/.git/*|*/.work/*|*/.tmp/*|*/.venv/*|*/node_modules/*|*/results/*|*/AGENTS.md/*)
             fail "invalid source input: $relative" ;;
     esac
+    # find sees the listed entry and descendants, not symlinked ancestors.
+    input_path=$project
+    remaining=$relative
+    while :; do
+        input_path="$input_path/${remaining%%/*}"
+        [ ! -L "$input_path" ] || fail "source input contains symlinks: $relative"
+        case "$remaining" in
+            */*) remaining=${remaining#*/} ;;
+            *) break ;;
+        esac
+    done
     [ -e "$project/$relative" ] || fail "missing source input: $relative"
     # Escaping symlinks and generated trees must never enter the flake snapshot.
     invalid=$(find "$project/$relative" \( -type l -o -name .git -o -name .work -o -name .tmp -o -name .venv -o -name node_modules -o -name results -o -name AGENTS.md \) -print)
